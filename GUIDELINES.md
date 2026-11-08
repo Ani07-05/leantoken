@@ -31,9 +31,4 @@ leantoken "task" --private
 
 Env: `LEANTOKEN_MODEL`, `LEANTOKEN_FALLBACKS` (comma list), `LEANTOKEN_LOCAL_MODEL`.
 
-## Repo rules
 
-- Conventional Commits, no co-author lines, no em dashes
-- Tests for approval, budget, path safety
-- Declare AI-assisted code in README
-- Never commit keys
