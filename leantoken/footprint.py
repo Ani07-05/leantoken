@@ -81,6 +81,7 @@ class Footprint:
     escalations: list = field(default_factory=list)
     fallbacks: int = 0
     rate_limit_wait_s: float = 0.0
+    saved_prompt: float = 0.0  # prompt tokens a naive agent would have sent on top of ours
     trace: list = field(default_factory=list)
     started: float = field(default_factory=time.time)
 
@@ -102,7 +103,12 @@ class Footprint:
             m["out"] += c.completion
             m["cost"] += c.cost
             m["kwh"] += c.kwh
+        used = sum(c.prompt + c.completion for c in self.calls)
+        saved = round(self.saved_prompt)
         return {
+            "saved_prompt": saved,
+            "naive_total": used + saved,
+            "saved_pct": round(100 * saved / (used + saved)) if used + saved else 0,
             "calls": len(self.calls),
             "in": sum(c.prompt for c in self.calls),
             "out": sum(c.completion for c in self.calls),
@@ -123,6 +129,7 @@ class Footprint:
             f"verified   {verified}",
             f"calls      {t['calls']}  (fallbacks {self.fallbacks}, escalations {len(self.escalations)})",
             f"tokens     {t['in'] + t['out']:,}  (in {t['in']:,} / out {t['out']:,})",
+            f"saved      ~{t['saved_prompt']:,} tokens ({t['saved_pct']}% fewer than a naive agent; estimate, see README)",
             f"cost       ${t['cost_usd']:.5f}  (price table; Bifrost logs are authoritative)",
             f"latency    {t['latency_s']}s model time" + (f", {self.rate_limit_wait_s:.0f}s rate-limit wait" if self.rate_limit_wait_s else ""),
             f"energy     {t['kwh'] * 1000:.4f} Wh  (EcoLogits estimate, PUE {PUE})",

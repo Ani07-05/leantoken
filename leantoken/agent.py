@@ -51,6 +51,7 @@ class Agent:
             configured = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
             self.fallbacks = configured or list(GROQ_CHAIN)
         self.fp = Footprint("")
+        self.naive: dict[str, int] = {}  # tool_call_id -> output size without clipping or ranged reads
         self.verified = "no tests run"
         self.step_limit = 15
 
@@ -116,11 +117,13 @@ class Agent:
         data = r.json()
         u = data.get("usage", {})
         pt, ct = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
+        saved = self._saved_prompt_tokens(body, pt)
+        self.fp.saved_prompt += saved
         model = data.get("model") or self.model
         self.budget.charge(model, pt, ct, local=self.private)
         region = data.get("extra_fields", {}).get("provider_response_headers", {}).get("X-Groq-Region", "")
         self.fp.add(model, pt, ct, latency, local=self.private, region=region)
-        self.emit("call", model=model, prompt=pt, completion=ct)
+        self.emit("call", model=model, prompt=pt, completion=ct, saved=saved)
         self.fp.fallbacks += r.headers.get("x-bifrost-routing-info-is-fallback") == "true"
         msg = data["choices"][0]["message"]
         # extras like "reasoning" would only cost tokens on the next call
@@ -129,9 +132,22 @@ class Agent:
             clean["tool_calls"] = msg["tool_calls"]
         return clean
 
+    def _saved_prompt_tokens(self, body: dict, prompt_tokens: int) -> float:
+        """Prompt tokens a naive agent would have added to this request: whole-file reads, unclipped output, no history trimming.
+
+        Sizes are measured; they become tokens at this request's real tokens-per-character ratio.
+        """
+        tools = [m for m in body["messages"] if m["role"] == "tool"]
+        sent_chars = len(json.dumps(body["messages"])) + len(json.dumps(body["tools"]))
+        if not tools or not sent_chars:
+            return 0.0
+        extra = sum(max(0, self.naive.get(m["tool_call_id"], len(m["content"])) - len(m["content"])) for m in tools)
+        return extra * prompt_tokens / sent_chars
+
     def _run_tool(self, call: dict) -> tuple[str, bool]:
         """Returns the tool output and whether the call failed."""
         name = call["function"]["name"]
+        self.ws.naive = None
         if not hasattr(Workspace, name) or name.startswith("_"):
             return f"error: unknown tool {name}", True
         try:
@@ -180,6 +196,7 @@ class Agent:
                     test_fails += edited and not ok
                 tool_errors = tool_errors + 1 if failed else 0
                 last_error = out[:120] if failed else ""
+                self.naive[call["id"]] = self.ws.naive if self.ws.naive is not None else len(out)
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
                 self.emit("tool", name=name, args=call["function"]["arguments"], out=out, failed=failed)
                 self.fp.trace.append({"step": step, "model": self.model, "tool": name,

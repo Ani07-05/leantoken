@@ -19,6 +19,7 @@ def clip(s: str, n: int = MAX_OUT) -> str:
 class Workspace:
     def __init__(self, root: Path):
         self.root = root.resolve()
+        self.naive: int | None = None  # size of this call's output for an agent with no limits
 
     def _path(self, p: str) -> Path:
         full = (self.root / p).resolve()
@@ -35,7 +36,9 @@ class Workspace:
                 end = v
             else:
                 raise TypeError(f"unexpected argument {k}; use path, start, end")
-        lines = self._path(path).read_text(errors="replace").splitlines()
+        text = self._path(path).read_text(errors="replace")
+        self.naive = len(text)
+        lines = text.splitlines()
         start = max(int(start), 1)
         chunk = lines[start - 1 : min(int(end), start - 1 + MAX_LINES)]
         body = "\n".join(f"{i}\t{l}" for i, l in enumerate(chunk, start))
@@ -48,6 +51,7 @@ class Workspace:
         else:
             cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
         out = subprocess.run(cmd, capture_output=True, text=True, errors="replace", cwd=self.root).stdout
+        self.naive = len(out)
         return clip(out.replace(str(self.root) + "/", "") or "no matches")
 
     def write_file(self, path: str, content: str) -> str:
@@ -76,7 +80,9 @@ class Workspace:
         # models sometimes send argv; run it as argv rather than re-quoting it
         r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, errors="replace", cwd=self.root,
                            timeout=min(int(timeout), 120) if timeout else 120)
-        return clip(f"exit={r.returncode}\n{r.stdout}{r.stderr}")
+        raw = f"exit={r.returncode}\n{r.stdout}{r.stderr}"
+        self.naive = len(raw)
+        return clip(raw)
 
 
 def unwrap(cmd: str | list) -> str | list:
