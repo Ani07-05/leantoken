@@ -19,7 +19,7 @@ Coding agents read whole files, resend long histories and use the largest model 
 | Private repos | `--private` uses a virtual key that only allows local Ollama; Bifrost refuses any cloud call |
 | Safe actions | Asks before file writes, edits, git actions and any shell command that isn't read-only |
 | Footprint report | Tokens, cost, latency, energy (kWh) and carbon (gCO2e) per task |
-| Live docs (optional) | Tavily search through Bifrost's MCP gateway, off in private mode |
+| Live docs (optional) | Tavily `web_search` tool, short answer plus 3 clipped results; off in private mode and when no key is set |
 
 ## Architecture
 
@@ -47,7 +47,8 @@ leantoken CLI ──> Bifrost gateway ──> Groq        (default)
 | Small-first routing | Done |
 | Footprint report | Done |
 | Benchmark vs a naive agent | Planned |
-| Tavily docs lookup | Planned |
+| Tavily docs lookup | Done (`web_search` tool, direct Tavily API) |
+| Terminal UI | Done (`leantoken` with no task) |
 
 ## Install
 
@@ -72,6 +73,7 @@ leantoken --pick-model         # choose a Groq model
 ## Usage
 
 ```
+leantoken                      # terminal UI: type a task, /help for commands
 leantoken "fix the failing test in tests/test_api.py" --repo path/to/repo
 leantoken "add input validation to create_user" --budget 0.50
 leantoken "rename Config to Settings" --private
