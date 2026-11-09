@@ -138,7 +138,8 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
             assert not app.query_one("#body").has_class("home")
             for _ in range(50):
                 await pilot.pause(0.05)
-                if isinstance(app.screen, tui.Approval):
+                if app.query_one("#perm").has_class("show"):
+                    assert app.query_one("#prompt").has_class("hidden")
                     await pilot.press("y")
                     break
             await app.workers.wait_for_complete()
@@ -247,3 +248,45 @@ def test_savings_measure_what_a_naive_agent_would_have_sent(tmp_path):
     assert seen[0] == 0 and seen[1] > 0
     assert t["saved_prompt"] > 0 and 0 < t["saved_pct"] < 100
     assert t["naive_total"] == t["in"] + t["out"] + t["saved_prompt"]
+
+
+def _ask_in_tui(tmp_path, text, keys):
+    import asyncio
+    import threading
+
+    from leantoken import tui
+    from leantoken.budget import Budget
+
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+    result = {}
+
+    async def go():
+        async with app.run_test() as pilot:
+            t = threading.Thread(target=lambda: result.update(ok=app.approve(text)))
+            t.start()
+            for _ in range(60):
+                await pilot.pause(0.05)
+                if app.query_one("#perm").has_class("show"):
+                    break
+            perm = app.query_one("#perm")
+            result["choices"] = list(perm.choices)
+            await pilot.press(*keys)
+            await pilot.pause(0.2)
+            t.join(timeout=3)
+            result["prompt_back"] = not app.query_one("#prompt").has_class("hidden")
+            result["always"] = set(app.always)
+
+    asyncio.run(go())
+    return result
+
+
+def test_permission_enter_confirms_the_highlighted_choice(tmp_path):
+    r = _ask_in_tui(tmp_path, "edit a.py\n- a\n+ b", ["right", "enter"])
+    assert r["choices"] == ["once", "always", "reject"]
+    assert r["ok"] is True and r["always"] == {"edit"} and r["prompt_back"]
+
+
+def test_permission_reject_and_shell_has_no_always(tmp_path):
+    r = _ask_in_tui(tmp_path, "shell: git push", ["n"])
+    assert r["choices"] == ["once", "reject"]
+    assert r["ok"] is False and r["always"] == set()

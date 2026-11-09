@@ -107,24 +107,77 @@ def edit_diff(args: str) -> Text | None:
     return out
 
 
-class Approval(ModalScreen[bool]):
-    BINDINGS = [("y", "allow", "allow"), ("n", "deny", "deny"), ("escape", "deny", "deny")]
+LABELS = {"once": "Allow once", "always": "Allow always", "reject": "Reject"}
+# a shell command can differ every time, so "always" is only offered for file edits
+ALWAYS_KINDS = ("edit", "write")
 
-    def __init__(self, text: str):
-        super().__init__()
-        self.text = text
+
+class Permission(Vertical):
+    """Replaces the prompt box while the agent waits for approval, like OpenCode."""
+
+    can_focus = True
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.choices = ["once", "reject"]
+        self.index = 0
+        self.done = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            yield Static("Permission required", id="dtitle")
-            yield Static(diff_text(self.text.rstrip()), id="dbody")
-            yield Static("[b]y[/b] allow   [b]n[/b] deny", id="dhint")
+        yield Static(id="ptitle")
+        yield Static(id="pbody")
+        yield Static(id="popts")
 
-    def action_allow(self) -> None:
-        self.dismiss(True)
+    def ask(self, text: str, allow_always: bool, done) -> None:
+        self.choices = ["once"] + (["always"] if allow_always else []) + ["reject"]
+        self.index, self.done = 0, done
+        head, _, body = text.partition("\n")
+        title = Text("△ ", style=WARN) + Text("Permission required", style=f"bold {WARN}")
+        title.append("   " + head.replace("shell: ", "$ ", 1), style=TEXT)
+        self.query_one("#ptitle", Static).update(title)
+        lines = body.rstrip().splitlines()
+        shown = lines[:14] + ([f"... {len(lines) - 14} more lines"] if len(lines) > 14 else [])
+        box = self.query_one("#pbody", Static)
+        box.display = bool(lines)
+        box.update(diff_text("\n".join(shown)))
+        self.add_class("show")
+        self.draw()
+        self.focus()
 
-    def action_deny(self) -> None:
-        self.dismiss(False)
+    def draw(self) -> None:
+        t = Text()
+        for i, choice in enumerate(self.choices):
+            t.append(f" {LABELS[choice]} ", style=f"bold {BG} on {ACCENT}" if i == self.index else TEXT)
+            t.append("  ")
+        t.append("  arrows select  enter confirm  esc reject", style=MUTED)
+        self.query_one("#popts", Static).update(t)
+
+    def decide(self, choice: str) -> None:
+        done, self.done = self.done, None
+        self.remove_class("show")
+        if done:
+            done(choice)
+
+    def on_key(self, event: events.Key) -> None:
+        key, n = event.key, len(self.choices)
+        if key in ("left", "h", "shift+tab"):
+            self.index = (self.index - 1) % n
+        elif key in ("right", "l"):
+            self.index = (self.index + 1) % n
+        elif key == "enter":
+            self.decide(self.choices[self.index])
+        elif key == "y":
+            self.decide("once")
+        elif key == "a" and "always" in self.choices:
+            self.decide("always")
+        elif key in ("n", "escape"):
+            self.decide("reject")
+        else:
+            return
+        event.stop()
+        event.prevent_default()
+        if self.done:
+            self.draw()
 
 
 class ModelPicker(ModalScreen[str]):
@@ -178,12 +231,16 @@ class TUI(App):
     .esc { color: #f5a742; }
     .diff { border-left: heavy #1e1e1e; padding: 0 1; margin: 0 0 0 2; }
     .note { color: #808080; }
-    Approval, ModelPicker { align: center middle; }
-    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border-left: heavy #f5a742; background: #1e1e1e; padding: 1 2; }
-    ModelPicker #dialog { border-left: heavy #5c9cf5; }
+    ModelPicker { align: center middle; }
+    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border-left: heavy #5c9cf5; background: #1e1e1e; padding: 1 2; }
     #dialog OptionList { background: #1e1e1e; border: none; padding: 0; }
     #dtitle { text-style: bold; margin-bottom: 1; }
     #dhint { margin-top: 1; color: #808080; }
+    #prompt.hidden { display: none; }
+    #perm { display: none; height: auto; background: #1e1e1e; border-left: heavy #f5a742; padding: 1 2; margin-top: 1; }
+    #perm.show { display: block; }
+    #pbody { margin-top: 1; }
+    #popts { margin-top: 1; }
     """
     BINDINGS = [
         Binding("ctrl+q", "quit", "quit", priority=True),
@@ -205,6 +262,7 @@ class TUI(App):
         self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
         self.files: list[str] = []
         self.matches: list[str] = []
+        self.always: set[str] = set()
         self.gateway_ok: bool | None = None
 
     def compose(self) -> ComposeResult:
@@ -216,6 +274,7 @@ class TUI(App):
                 with Vertical(id="prompt"):
                     yield Input(placeholder="Ask anything...  \"fix the failing test\"", id="input")
                     yield Static(id="mode")
+                yield Permission(id="perm")
             yield Static(id="side")
         yield Static(id="foot")
 
@@ -422,6 +481,7 @@ class TUI(App):
         self.query_one("#body").add_class("home")
         self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
         self.files = []
+        self.always = set()
         self.refresh_chrome()
 
     @work(thread=True, exclusive=True, group="models")
@@ -452,10 +512,26 @@ class TUI(App):
         self.busy = False
 
     def approve(self, text: str) -> bool:
+        kind = text.split()[0].rstrip(":")
+        if kind in self.always:
+            return True
         done, box = threading.Event(), []
-        self.call_from_thread(self.push_screen, Approval(text), lambda ok: (box.append(ok), done.set()))
+
+        def decided(choice: str) -> None:
+            self.query_one("#prompt").remove_class("hidden")
+            self.query_one("#input").focus()
+            box.append(choice)
+            done.set()
+
+        self.call_from_thread(self.ask_permission, text, kind in ALWAYS_KINDS, decided)
         done.wait()
-        return box[0]
+        if box[0] == "always":
+            self.always.add(kind)
+        return box[0] in ("once", "always")
+
+    def ask_permission(self, text: str, allow_always: bool, decided) -> None:
+        self.query_one("#prompt").add_class("hidden")
+        self.query_one("#perm", Permission).ask(text, allow_always, decided)
 
     def on_agent_event(self, kind: str, **d) -> None:
         self.call_from_thread(self.show_event, kind, d)
