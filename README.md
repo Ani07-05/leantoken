@@ -46,7 +46,7 @@ leantoken CLI ──> Bifrost gateway ──> Groq        (default)
 | All calls through Bifrost | Done |
 | Small-first routing | Done |
 | Footprint report | Done |
-| Benchmark vs a naive agent | Planned |
+| Benchmark vs a naive agent | Done, see Benchmark |
 | Tavily docs lookup | Done (`web_search` tool, direct Tavily API) |
 | Terminal UI | Done (`leantoken` with no task) |
 
@@ -93,6 +93,36 @@ Each run prints a footprint report and saves it, with a per-step trace, to `<rep
 ## Token savings
 
 Every task reports how many prompt tokens it saved against a naive agent on the same run. The naive twin of each request reads whole files instead of line ranges, keeps tool output unclipped and never trims old tool results. Each naive tool output is capped at 30,000 characters, roughly what real agents truncate at, so one giant listing cannot inflate the figure. We measure the size of each tool output both ways, then convert the extra characters to tokens at that request's real tokens-per-character ratio (from the API's `usage`). Output tokens are not counted as saved. The energy and carbon saved are scaled from the token saving, assuming energy per token stays constant, because the energy model ignores input tokens; treat them as rough estimates. The shorter system prompt and tool schemas are not counted either, so the figure is conservative. In a long session the gap grows: leantoken carries a compact note of earlier turns (question, short answer, files touched) while the naive twin resends the whole earlier transcript every turn. The TUI plots both per turn. It is an estimate of one run, not a benchmark: the benchmark against a real naive agent is separate.
+
+## Benchmark
+
+Same model (`groq/openai/gpt-oss-120b`), same tasks, same Groq free-tier limits, every call through Bifrost. Token counts are the API's own `usage`. The naive arm uses the same loop and tools but reads whole files, keeps tool output unclipped, never trims history and resends the full transcript on every turn. Reproduce with `.venv/bin/python bench/run.py`; raw numbers are in `bench/results.json`.
+
+**Coding: fix a seeded bug in a small shop library** (pass = `pytest` is green afterwards)
+
+| Task | leantoken | naive | fewer tokens |
+|---|---|---|---|
+| discount | 9,287 | 25,641 | 63% |
+| restock | 4,276 | 7,622 | 43% |
+| cart | 4,385 | 8,309 | 47% |
+| month | 4,754 | 8,860 | 46% |
+| **total** | **22,702 ($0.0030)** | **50,432 ($0.0065)** | **54%** |
+
+Both arms fixed 4 of 4.
+
+**Session: 8 follow-up questions about the same project**
+
+| After turn | leantoken (cumulative) | naive (cumulative) |
+|---|---|---|
+| 1 | 968 | 3,480 |
+| 3 | 4,724 | 12,654 |
+| 5 | 9,394 | 28,810 |
+| 6 | 12,710 | stopped: Groq rejected a 19,450-token request (413) |
+| 8 | 15,984 | did not finish |
+
+leantoken answered 7 of 8 checks. The miss is turn 7: it answered `YYYY-MM`, which is correct, but our keyword check wanted the words "year" and "month"; we kept the check as written. The naive agent answered 5 of 5 before it failed, then could not continue: its transcript outgrew the provider's per-request limit.
+
+Limits: one run per arm, one model, one small synthetic project, free-tier rate limits. On a paid tier the naive agent would not have crashed, it would just have cost more. Treat the percentages as indicative, not general.
 
 ## Measurement
 

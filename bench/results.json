@@ -16,8 +16,340 @@
     "error": "",
     "answer": "Implemented correct discount logic in `pricing.py`, now all tests pass.",
     "passed": true
+   },
+   "restock": {
+    "tokens": 4276,
+    "in": 4041,
+    "out": 235,
+    "calls": 6,
+    "cost_usd": 0.0005,
+    "seconds": 3.8,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented inclusive threshold check in `inventory.py` for correct restock logic.",
+    "passed": true
+   },
+   "cart": {
+    "tokens": 4385,
+    "in": 4114,
+    "out": 271,
+    "calls": 6,
+    "cost_usd": 0.00067,
+    "seconds": 3.7,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented quantity-aware pricing in Cart: updated total calculation to multiply price by qty. All tests now pass.",
+    "passed": true
+   },
+   "month": {
+    "tokens": 4754,
+    "in": 4513,
+    "out": 241,
+    "calls": 6,
+    "cost_usd": 0.00068,
+    "seconds": 7.5,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "All tests now pass.",
+    "passed": true
+   }
+  },
+  "naive": {
+   "discount": {
+    "tokens": 25641,
+    "in": 24689,
+    "out": 952,
+    "calls": 10,
+    "cost_usd": 0.00291,
+    "seconds": 40.9,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented the correct discount calculation in **pricing.py**.\n\n### Key Changes\n- Updated `apply_discount` to correctly apply the fractional discount by multiplying with `(1 - discount)` instead of `discount`.\n- Added comments for clarity (implicitly maintained by function documentation).\n\nAll test",
+    "passed": true
+   },
+   "restock": {
+    "tokens": 7622,
+    "in": 7237,
+    "out": 385,
+    "calls": 6,
+    "cost_usd": 0.00113,
+    "seconds": 4.5,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented fix for inventory threshold logic.\n\n### Key Changes\n- Updated `Inventory.needs_restock` to return `True` when stock is **at or below** the threshold (`<=` instead of `<`).\n- Updated documentation string accordingly.\n\n### Result\nAll tests now pass successfully.\n\n```\npytest -q\n......      ",
+    "passed": true
+   },
+   "cart": {
+    "tokens": 8309,
+    "in": 7894,
+    "out": 415,
+    "calls": 7,
+    "cost_usd": 0.00132,
+    "seconds": 5.6,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented fix in `cart.py`:\n\n- Updated total calculation to correctly account for item quantities by summing `price * qty` for each item.\n- Ensured default quantity handling with `i.get(\"qty\", 1)`.\n\nAll tests now pass (`6 passed`).",
+    "passed": true
+   },
+   "month": {
+    "tokens": 8860,
+    "in": 8423,
+    "out": 437,
+    "calls": 7,
+    "cost_usd": 0.00113,
+    "seconds": 4.5,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented a fix in **reports.py**:\n\n- Corrected the key calculation for monthly summaries to use the actual month (`{d.month:02d}`) instead of subtracting one.\n- Added explanatory comment.\n\nAll tests now pass.\n\n```\n6 passed in 0.01s\n```\n",
+    "passed": true
    }
   }
  },
- "session": {}
+ "session": {
+  "lean": [
+   {
+    "tokens": 968,
+    "in": 874,
+    "out": 94,
+    "calls": 2,
+    "cost_usd": 0.00015,
+    "seconds": 2.3,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The discount logic lives in **pricing.py**, implemented by the **apply_discount** function.",
+    "question": "Which module computes discounts, and which function?",
+    "passed": true
+   },
+   {
+    "tokens": 1875,
+    "in": 1760,
+    "out": 115,
+    "calls": 3,
+    "cost_usd": 0.00025,
+    "seconds": 2.4,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "80.00",
+    "question": "What does that function return for a price of 100 and a discount of 0.2?",
+    "passed": true
+   },
+   {
+    "tokens": 1881,
+    "in": 1766,
+    "out": 115,
+    "calls": 3,
+    "cost_usd": 0.00024,
+    "seconds": 2.6,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Tax rate is defined in\u202fpricing.py\u202fas\u202fTAX_RATE\u202f=\u202f0.18.",
+    "question": "Where is the tax rate defined and what is it?",
+    "passed": true
+   },
+   {
+    "tokens": 2357,
+    "in": 2196,
+    "out": 161,
+    "calls": 3,
+    "cost_usd": 0.00043,
+    "seconds": 5.2,
+    "models": [
+     "openai/gpt-oss-120b"
+    ],
+    "error": "",
+    "answer": "The cart\u2019s\u202ftotal()\u202fmethod sums each line\u2019s\u202fprice\u202f\u00d7\u202fqty\u202fto get a raw subtotal, then passes that subtotal and any discount argument to\u202fpricing.apply_discount\u202fto return the final total.",
+    "question": "How does the cart compute its total?",
+    "passed": true
+   },
+   {
+    "tokens": 2313,
+    "in": 2199,
+    "out": 114,
+    "calls": 3,
+    "cost_usd": 0.00031,
+    "seconds": 2.3,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "True when the stock of an item is at or below the given threshold.",
+    "question": "When does the inventory say an item needs restocking?",
+    "passed": true
+   },
+   {
+    "tokens": 3316,
+    "in": 3181,
+    "out": 135,
+    "calls": 4,
+    "cost_usd": 0.00051,
+    "seconds": 5.4,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The orders are grouped by month in the **reports.py** module, specifically in its **monthly_summary** function.",
+    "question": "Which module groups orders by month?",
+    "passed": true
+   },
+   {
+    "tokens": 2561,
+    "in": 2425,
+    "out": 136,
+    "calls": 3,
+    "cost_usd": 0.00022,
+    "seconds": 3.0,
+    "models": [
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "YYYY\u2011MM (e.g., \u201c2026\u201103\u201d).",
+    "question": "What format are the keys of the monthly summary?",
+    "passed": false
+   },
+   {
+    "tokens": 713,
+    "in": 607,
+    "out": 106,
+    "calls": 1,
+    "cost_usd": 0.00015,
+    "seconds": 0.5,
+    "models": [
+     "openai/gpt-oss-120b"
+    ],
+    "error": "",
+    "answer": "- Discount logic is in **pricing.py**, implemented by the **apply_discount** function, which returns the price after applying the given discount (e.g., price\u202f100, discount\u202f0.2 \u2192\u202f80.00).  \n- Tax rate is defined in **pricing.py** as **TAX_RATE = 0.18**, and the cart\u2019s **total()** method uses **apply_d",
+    "question": "Summarise what you told me about pricing in two bullets.",
+    "passed": true
+   }
+  ],
+  "naive": [
+   {
+    "tokens": 3480,
+    "in": 3226,
+    "out": 254,
+    "calls": 4,
+    "cost_usd": 0.00036,
+    "seconds": 3.9,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The discount calculations are handled in **`pricing.py`**.  \nThe key function that applies a fractional discount is:\n\n```python\ndef apply_discount(price, discount):\n    \"\"\"Return the price after a fractional discount, where 0.2 means 20% off.\"\"\"\n    return round(price * (1 - discount), 2)\n```\n\nThis ",
+    "question": "Which module computes discounts, and which function?",
+    "passed": true
+   },
+   {
+    "tokens": 2231,
+    "in": 2047,
+    "out": 184,
+    "calls": 1,
+    "cost_usd": 0.00042,
+    "seconds": 1.9,
+    "models": [
+     "openai/gpt-oss-120b"
+    ],
+    "error": "",
+    "answer": "For a price of\u202f100 with a discount of\u202f0.2, the function computes:\n\n```python\nprice * (1 - discount)   # 100 * 0.8 = 80.0\nround(..., 2)            # rounds to two decimal places \u2192 80.0\n```\n\nSo `apply_discount(100, 0.2)` returns **`80`** (as a float `80.0`).",
+    "question": "What does that function return for a price of 100 and a discount of 0.2?",
+    "passed": true
+   },
+   {
+    "tokens": 6943,
+    "in": 6796,
+    "out": 147,
+    "calls": 3,
+    "cost_usd": 0.00073,
+    "seconds": 2.0,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The tax rate is defined at the top of **`pricing.py`**:\n\n```python\nTAX_RATE = 0.18\n```\n\nSo the tax rate used throughout the code is **18\u202f%**.",
+    "question": "Where is the tax rate defined and what is it?",
+    "passed": true
+   },
+   {
+    "tokens": 6542,
+    "in": 6256,
+    "out": 286,
+    "calls": 2,
+    "cost_usd": 0.00075,
+    "seconds": 2.3,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The `Cart.total()` method works in two steps:\n\n1. **Sum of line totals**  \n   ```python\n   raw = sum(i[\"price\"] * i[\"qty\"] for i in self.items)\n   ```  \n   It multiplies the unit price by the quantity for each line item and sums all those values to get the raw cart value.\n\n2. **Apply a cart\u2011wide dis",
+    "question": "How does the cart compute its total?",
+    "passed": true
+   },
+   {
+    "tokens": 9614,
+    "in": 9318,
+    "out": 296,
+    "calls": 2,
+    "cost_usd": 0.0011,
+    "seconds": 2.6,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "The `Inventory` class keeps a dictionary of current stock quantities.  \nThe method that decides whether an item should be reordered is:\n\n```python\ndef needs_restock(self, item, threshold):\n    \"\"\"True when the stock of an item is at or below the threshold.\"\"\"\n    return self.stock.get(item, 0) <= th",
+    "question": "When does the inventory say an item needs restocking?",
+    "passed": true
+   },
+   {
+    "tokens": 19450,
+    "in": 19318,
+    "out": 132,
+    "calls": 3,
+    "cost_usd": 0.00192,
+    "seconds": 17.8,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "Bifrost 413: {\"is_bifrost_error\":false,\"status_code\":413,\"error\":{\"type\":\"tokens\",\"code\":\"rate_limit_exceeded\",\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01kf2kk",
+    "answer": "",
+    "question": "Which module groups orders by month?",
+    "passed": false
+   }
+  ]
+ }
 }
