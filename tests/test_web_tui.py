@@ -326,5 +326,25 @@ def test_garbled_shell_commands_are_rejected_before_asking(tmp_path):
     from leantoken.tools import unrunnable
 
     assert unrunnable("sh_lev sh_lev sh_lev").startswith("error: command not found: sh_lev")
-    for ok in ("git status", "FOO=1 ls -l", "cd x \&\& ls", "[ -f a ]", "./run.sh", "git log --oneline"):
+    for ok in ("git status", "FOO=1 ls -l", "cd x && ls", "[ -f a ]", "./run.sh", "git log --oneline"):
         assert unrunnable(ok) is None, ok
+
+
+def test_recursive_ls_is_refused_with_a_hint():
+    from leantoken.tools import unrunnable
+
+    for cmd in ("ls -R", "ls -laR src", "ls --recursive"):
+        assert "Use search" in unrunnable(cmd), cmd
+    assert unrunnable("ls -la src") is None
+
+
+def test_one_huge_output_cannot_inflate_savings(tmp_path):
+    from leantoken.agent import NAIVE_CAP, Agent
+    from leantoken.budget import Budget
+
+    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m")
+    agent.naive["c1"] = NAIVE_CAP
+    body = {"messages": [{"role": "tool", "tool_call_id": "c1", "content": "x" * 1000}], "tools": []}
+    capped = agent._saved_prompt_tokens(body, 1000)
+    agent.naive["c1"] = 10 * NAIVE_CAP
+    assert agent._saved_prompt_tokens(body, 1000) > capped

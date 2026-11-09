@@ -111,6 +111,8 @@ def unrunnable(cmd: str) -> str | None:
     except ValueError:
         return None
     words = [w for w in words if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w)] if words and "=" in words[0] else words
+    if words and words[0] == "ls" and any(w == "--recursive" or (w.startswith("-") and not w.startswith("--") and "R" in w) for w in words[1:]):
+        return "error: ls -R prints the whole tree. Use search to find files, or ls <dir> for one folder."
     if not words or words[0] in SHELL_BUILTINS or "/" in words[0] or shutil.which(words[0]):
         return None
     return f"error: command not found: {words[0]}. Send a real command line such as pytest -q or git status."

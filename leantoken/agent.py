@@ -17,6 +17,8 @@ SYSTEM = (
 )
 KEEP_FULL = 2  # older tool results shrink to a stub; every kept result is re-sent on every later call
 ELIDE_TO = 120
+# the naive twin gets a generous output cap too, so one giant listing cannot inflate the savings figure
+NAIVE_CAP = 30_000
 # Groq free tier caps tokens per minute per model, so a rate-limited call retries on another model's budget
 GROQ_CHAIN = ("groq/openai/gpt-oss-120b", "groq/qwen/qwen3.8-27b", "groq/openai/gpt-oss-20b")
 RATE_LIMIT_WAITS = 4  # Groq free tier allows 8k tokens/min on the large model
@@ -198,7 +200,7 @@ class Agent:
                     test_fails += edited and not ok
                 tool_errors = tool_errors + 1 if failed else 0
                 last_error = out[:120] if failed else ""
-                self.naive[call["id"]] = self.ws.naive if self.ws.naive is not None else len(out)
+                self.naive[call["id"]] = min(NAIVE_CAP, self.ws.naive if self.ws.naive is not None else len(out))
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
                 self.emit("tool", name=name, args=call["function"]["arguments"], out=out, failed=failed)
                 self.fp.trace.append({"step": step, "model": self.model, "tool": name,
