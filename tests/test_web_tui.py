@@ -133,7 +133,9 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
 
     async def go():
         async with app.run_test() as pilot:
+            assert app.query_one("#body").has_class("home")
             await pilot.press(*"fix it", "enter")
+            assert not app.query_one("#body").has_class("home")
             for _ in range(50):
                 await pilot.pause(0.05)
                 if isinstance(app.screen, tui.Approval):
@@ -145,5 +147,7 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
             assert "all done" in texts
             assert app.files == ["a.py"]
             assert app.session["tasks"] == 1 and not app.busy
+            await pilot.press("ctrl+n")
+            assert app.query_one("#body").has_class("home")
 
     asyncio.run(go())

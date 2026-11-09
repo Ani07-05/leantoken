@@ -33,6 +33,26 @@ ACCENT, WARN, TEXT, MUTED, PANEL, BG = "#5c9cf5", "#f5a742", "#eeeeee", "#808080
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
+GLYPHS = {
+    "l": ("█   ", "█   ", "▀▀▀▀"),
+    "e": ("█▀▀█", "█▀▀▀", "▀▀▀▀"),
+    "a": ("█▀▀█", "█▀▀█", "▀  ▀"),
+    "n": ("█▀▀▄", "█  █", "▀  ▀"),
+    "t": ("▀█▀▀", " █  ", " ▀▀▀"),
+    "o": ("█▀▀█", "█  █", "▀▀▀▀"),
+    "k": ("█ ▄▀", "█▀▄ ", "▀  ▀"),
+}
+
+
+def logo() -> Text:
+    out = Text(justify="center")
+    for row in range(3):
+        for i, ch in enumerate("leantoken"):
+            out.append(GLYPHS[ch][row] + ("" if i == 8 else " "), style=MUTED if i < 4 else TEXT)
+        out.append("\n" if row < 2 else "")
+    return out
+
+
 def pretty_path(path: Path, width: int = 48) -> str:
     text = str(path).replace(str(Path.home()), "~", 1)
     return text if len(text) <= width else "…" + text[-(width - 1):]
@@ -131,8 +151,13 @@ class TUI(App):
     #input:focus { border: none; background: transparent; background-tint: transparent; }
     #input > .input--placeholder { color: #808080; text-style: none; }
     #mode { height: 1; margin-top: 1; }
-    #edge { height: 1; }
-    #foot { height: 1; padding: 0 1; }
+    #foot { height: 1; padding: 0 3; }
+    #logo { display: none; height: auto; width: 100%; margin-bottom: 2; text-align: center; }
+    #body.home #logo { display: block; width: 80; max-width: 100%; }
+    #body.home #chat { display: none; }
+    #body.home #side { display: none; }
+    #body.home #main { align: center middle; }
+    #body.home #prompt { width: 80; max-width: 100%; margin-top: 0; }
     .user { border-left: heavy #5c9cf5; padding: 0 2; margin-top: 1; background: #1e1e1e; }
     .answer { margin: 1 0 0 0; padding: 0; }
     .tool { color: #808080; margin: 0; }
@@ -166,28 +191,31 @@ class TUI(App):
         self.files: list[str] = []
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="body"):
+        with Horizontal(id="body", classes="home"):
             with Vertical(id="main"):
+                yield Static(logo(), id="logo")
                 yield VerticalScroll(id="chat")
                 with Vertical(id="prompt"):
                     yield Input(placeholder="Ask anything...  \"fix the failing test\"", id="input")
                     yield Static(id="mode")
-                yield Static(id="edge")
-                yield Static(id="foot")
             yield Static(id="side")
+        yield Static(id="foot")
 
     def on_mount(self) -> None:
         self.query_one("#input").focus()
         self.set_interval(0.1, self.tick)
-        self.say(Static(Text("leantoken", style="bold") + Text("  the coding agent that watches its tokens", style="dim")))
-        self.say(Static(Text(f"{pretty_path(self.repo)}  via {bifrost_url()}", style="dim")))
         self.call_after_refresh(self.refresh_chrome)
 
     @property
     def chat(self) -> VerticalScroll:
         return self.query_one("#chat", VerticalScroll)
 
+    def enter_session(self) -> None:
+        self.query_one("#body").remove_class("home")
+        self.call_after_refresh(self.refresh_chrome)
+
     def say(self, widget, classes: str = "") -> None:
+        self.enter_session()
         if classes:
             widget.add_class(*classes.split())
         self.chat.mount(widget)
@@ -211,7 +239,6 @@ class TUI(App):
 
     def refresh_chrome(self) -> None:
         self.query_one("#prompt").set_class(self.busy, "busy")
-        color = WARN if self.busy else ACCENT
         mode = Text()
         if self.busy:
             mode.append(f"{FRAMES[self.frame]} working", style=WARN)
@@ -221,7 +248,6 @@ class TUI(App):
         mode.append(" · ", style=MUTED)
         mode.append_text(self.route())
         self.query_one("#mode", Static).update(mode)
-        self.query_one("#edge", Static).update(Text("╹" + "▀" * 400, style=color, no_wrap=True, overflow="crop"))
         left = Text(pretty_path(self.repo), style=MUTED)
         hints = Text()
         for key, label in (("ctrl+b", "sidebar"), ("ctrl+n", "new"), ("ctrl+o", "models"), ("ctrl+q", "quit")):
@@ -306,6 +332,7 @@ class TUI(App):
         if self.busy:
             return
         self.chat.remove_children()
+        self.query_one("#body").add_class("home")
         self.session = {"tokens": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
         self.files = []
         self.refresh_chrome()
