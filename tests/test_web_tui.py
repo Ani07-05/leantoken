@@ -151,3 +151,30 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
             assert app.query_one("#body").has_class("home")
 
     asyncio.run(go())
+
+
+def test_read_file_caps_span_and_numbers_from_one(tmp_path):
+    (tmp_path / "big.txt").write_text("\n".join(f"l{i}" for i in range(1, 501)))
+    out = Workspace(tmp_path).read_file("big.txt", start=0, end=500)
+    assert out.startswith("1\tl1\n") and "151\t" not in out and "[500 lines total]" in out
+
+
+def test_search_survives_binary_files(tmp_path):
+    (tmp_path / "a.bin").write_bytes(b"needle \x9c\xff\x00 needle")
+    (tmp_path / "b.txt").write_text("needle here")
+    out = Workspace(tmp_path).search("needle")
+    assert "b.txt" in out and not out.startswith("error")
+
+
+def test_groq_models_back_each_other_up_on_rate_limits(tmp_path, monkeypatch):
+    from leantoken.agent import Agent
+    from leantoken.budget import Budget
+
+    monkeypatch.delenv("LEANTOKEN_FALLBACKS", raising=False)
+    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "openai/gpt-oss-120b", small="openai/gpt-oss-20b")
+    sent = []
+    agent._post = lambda body: (sent.append(body), type("R", (), {"status_code": 200, "text": "", "headers": {}, "json": lambda s: {"model": body["model"], "choices": [{"message": {"content": "ok"}}], "usage": {}}})())[1]
+    agent.run("t")
+    assert sent[0]["model"] == "groq/openai/gpt-oss-20b"
+    assert sent[0]["fallbacks"] == ["groq/openai/gpt-oss-120b", "groq/qwen/qwen3.8-27b"]
+    assert sent[0]["reasoning_effort"] == "low"

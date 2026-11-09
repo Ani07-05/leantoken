@@ -15,7 +15,10 @@ SYSTEM = (
     "You are a terse coding agent. Use search and ranged read_file, never read whole files. "
     "Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
 )
-KEEP_FULL = 4
+KEEP_FULL = 2  # older tool results shrink to a stub; every kept result is re-sent on every later call
+ELIDE_TO = 120
+# Groq free tier caps tokens per minute per model, so a rate-limited call retries on another model's budget
+GROQ_CHAIN = ("groq/openai/gpt-oss-120b", "groq/qwen/qwen3.8-27b", "groq/openai/gpt-oss-20b")
 RATE_LIMIT_WAITS = 4  # Groq free tier allows 8k tokens/min on the large model
 # right-size routing: the small model handles the task until one of these trips, then the large one finishes it
 SMALL_MAX_STEPS = 8  # small model still not done after this many steps
@@ -45,7 +48,8 @@ class Agent:
         else:
             self.large = groq_model(model)
             self.model = groq_model(small) if small else self.large
-            self.fallbacks = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
+            configured = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
+            self.fallbacks = configured or list(GROQ_CHAIN)
         self.fp = Footprint("")
         self.verified = "no tests run"
         self.step_limit = 15
@@ -71,7 +75,7 @@ class Agent:
         tool_idx = [i for i, m in enumerate(messages) if m["role"] == "tool"]
         old = set(tool_idx[:-KEEP_FULL])
         return [
-            {**m, "content": m["content"][:150] + " [elided]"} if i in old and len(m["content"]) > 150 else m
+            {**m, "content": m["content"][:ELIDE_TO] + " [elided]"} if i in old and len(m["content"]) > ELIDE_TO else m
             for i, m in enumerate(messages)
         ]
 
@@ -81,8 +85,10 @@ class Agent:
     def _chat(self, messages: list, step: int = 0, retried: bool = False) -> dict:
         self.budget.check()
         body = {"model": self.model, "messages": self._trim(messages), "tools": self.tools, "max_tokens": 1024}
-        if self.fallbacks:
-            body["fallbacks"] = self.fallbacks
+        if "gpt-oss" in self.model:
+            body["reasoning_effort"] = "low"  # hidden reasoning is billed as output tokens and counts against the minute cap
+        if fallbacks := [m for m in self.fallbacks if m != self.model]:
+            body["fallbacks"] = fallbacks
         for _ in range(RATE_LIMIT_WAITS + 1):
             t0 = time.perf_counter()
             r = self._post(body)

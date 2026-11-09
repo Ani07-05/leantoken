@@ -4,7 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-MAX_OUT = 3000
+MAX_OUT = 1600
+MAX_LINES = 150  # per read_file call; every later turn pays for what is read now
 SHELL = "Windows cmd.exe" if os.name == "nt" else "POSIX sh"
 SAFE_CMD = re.compile(r"^(git (status|diff|log|show|branch)|ls|pwd|cat|head|tail|wc)\b[^;&|><`$]*$")
 
@@ -25,7 +26,7 @@ class Workspace:
             raise ValueError(f"path escapes repo: {p}")
         return full
 
-    def read_file(self, path: str, start: int = 1, end: int = 200, **alias) -> str:
+    def read_file(self, path: str, start: int = 1, end: int = 100, **alias) -> str:
         # models guess names like line_start/end_line; a wrong guess would cost a round trip
         for k, v in alias.items():
             if "start" in k:
@@ -35,7 +36,8 @@ class Workspace:
             else:
                 raise TypeError(f"unexpected argument {k}; use path, start, end")
         lines = self._path(path).read_text(errors="replace").splitlines()
-        chunk = lines[max(start - 1, 0) : end]
+        start = max(int(start), 1)
+        chunk = lines[start - 1 : min(int(end), start - 1 + MAX_LINES)]
         body = "\n".join(f"{i}\t{l}" for i, l in enumerate(chunk, start))
         return clip(body + f"\n[{len(lines)} lines total]")
 
@@ -44,8 +46,8 @@ class Workspace:
         if shutil.which("rg"):
             cmd = ["rg", "-n", "--no-heading", "-m", "5", pattern, target]
         else:
-            cmd = ["grep", "-rn", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
-        out = subprocess.run(cmd, capture_output=True, text=True, cwd=self.root).stdout
+            cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
+        out = subprocess.run(cmd, capture_output=True, text=True, errors="replace", cwd=self.root).stdout
         return clip(out.replace(str(self.root) + "/", "") or "no matches")
 
     def write_file(self, path: str, content: str) -> str:
@@ -72,7 +74,7 @@ class Workspace:
     def run_shell(self, cmd: str | list, timeout: int = 120) -> str:
         cmd = unwrap(cmd)
         # models sometimes send argv; run it as argv rather than re-quoting it
-        r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, cwd=self.root,
+        r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, errors="replace", cwd=self.root,
                            timeout=min(int(timeout), 120) if timeout else 120)
         return clip(f"exit={r.returncode}\n{r.stdout}{r.stderr}")
 
@@ -123,14 +125,14 @@ S = {"type": "string"}
 I = {"type": "integer"}
 CMD = {"anyOf": [S, {"type": "array", "items": S}]}
 SCHEMAS = [
-    _fn("read_file", "Read a line range of a file.", {"path": S, "start": I, "end": I}, ["path"]),
-    _fn("search", "Regex search, max 5 hits per file.", {"pattern": S, "path": S}, ["pattern"]),
-    _fn("edit_file", "Replace one exact unique string in a file.", {"path": S, "old": S, "new": S}, ["path", "old", "new"]),
+    _fn("read_file", "Read lines start..end (max 150).", {"path": S, "start": I, "end": I}, ["path"]),
+    _fn("search", "Regex search, 5 hits per file.", {"pattern": S, "path": S}, ["pattern"]),
+    _fn("edit_file", "Replace one unique exact string.", {"path": S, "old": S, "new": S}, ["path", "old", "new"]),
     _fn("write_file", "Create or overwrite a file.", {"path": S, "content": S}, ["path", "content"]),
-    _fn("run_shell", f"Run a {SHELL} command string from the repo root (tests, git).", {"cmd": CMD, "timeout": I}, ["cmd"]),
+    _fn("run_shell", f"Run a {SHELL} command (tests, git). Never ls -R or cat big files.", {"cmd": CMD}, ["cmd"]),
 ]
 
-WEB_SCHEMA = _fn("web_search", "Search the web for current docs or API usage. Use only when the repo cannot answer.", {"query": S, "max_results": I}, ["query"])
+WEB_SCHEMA = _fn("web_search", "Web search for current docs. Only if the repo cannot answer.", {"query": S, "max_results": I}, ["query"])
 
 
 def schemas(web: bool = False) -> list:
