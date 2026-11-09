@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 import httpx
 
 from leantoken import web
@@ -252,7 +254,7 @@ def test_savings_measure_what_a_naive_agent_would_have_sent(tmp_path):
     assert seen[0] == 0 and seen[1] > 0
     assert t["saved_prompt"] > 0 and 0 < t["saved_pct"] < 100
     assert t["naive_total"] == t["in"] + t["out"] + t["saved_prompt"]
-    assert t["saved_kwh"] == t["kwh"] * t["saved_prompt"] / (t["in"] + t["out"])
+    assert t["saved_kwh"] == pytest.approx(t["kwh"] * t["saved_prompt"] / (t["in"] + t["out"]))
 
 
 def _ask_in_tui(tmp_path, text, keys):
@@ -397,3 +399,37 @@ def test_later_turns_get_a_memory_of_earlier_ones(tmp_path):
     agent.run("second")
     assert "Earlier in this session" in sent[0]["messages"][1]["content"] and "Task: second" in sent[0]["messages"][1]["content"]
     assert agent.turn_naive > 0 and agent.note("ok")["task"] == "second"
+
+
+def test_naive_workspace_returns_whole_files_and_unclipped_output(tmp_path):
+    (tmp_path / "big.txt").write_text("\n".join(f"line {i}" for i in range(1, 801)))
+    lean, naive = Workspace(tmp_path, lean=True), Workspace(tmp_path, lean=False)
+    assert "line 101" not in lean.read_file("big.txt") and "line 800" in naive.read_file("big.txt")
+    assert len(naive.run_shell("seq 1 5000")) > 20_000 > len(lean.run_shell("seq 1 5000"))
+
+
+def test_naive_agent_sends_everything_it_ever_saw(tmp_path):
+    from leantoken.agent import Agent
+    from leantoken.budget import Budget
+
+    sent = []
+
+    class R:
+        status_code, text, headers = 200, "", {}
+
+        def json(self):
+            return {"model": "groq/openai/gpt-oss-120b", "choices": [{"message": {"content": "ok"}}], "usage": {"prompt_tokens": 10, "completion_tokens": 1}}
+
+    def post(body):
+        sent.append(body)
+        return R()
+
+    history = [{"role": "user", "content": "earlier"}, {"role": "tool", "tool_call_id": "z", "content": "T" * 5000}]
+    naive = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/openai/gpt-oss-120b", lean=False, history=history)
+    naive._post = post
+    naive.run("now")
+    assert sent[0]["messages"][2]["content"] == "T" * 5000 and "reasoning_effort" not in sent[0]
+    lean = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/openai/gpt-oss-120b")
+    lean._post = post
+    lean.run("now")
+    assert sent[1]["reasoning_effort"] == "low"

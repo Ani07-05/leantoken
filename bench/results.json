@@ -1,0 +1,23 @@
+{
+ "model": "groq/openai/gpt-oss-120b",
+ "coding": {
+  "lean": {
+   "discount": {
+    "tokens": 9287,
+    "in": 8912,
+    "out": 375,
+    "calls": 9,
+    "cost_usd": 0.00115,
+    "seconds": 8.9,
+    "models": [
+     "openai/gpt-oss-120b",
+     "openai/gpt-oss-20b"
+    ],
+    "error": "",
+    "answer": "Implemented correct discount logic in `pricing.py`, now all tests pass.",
+    "passed": true
+   }
+  }
+ },
+ "session": {}
+}

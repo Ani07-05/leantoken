@@ -18,8 +18,9 @@ def clip(s: str, n: int = MAX_OUT) -> str:
 
 
 class Workspace:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, lean: bool = True):
         self.root = root.resolve()
+        self.lean = lean  # False gives the benchmark's naive agent: whole files, unclipped output
         self.naive: int | None = None  # size of this call's output for an agent with no limits
 
     def _path(self, p: str) -> Path:
@@ -28,7 +29,10 @@ class Workspace:
             raise ValueError(f"path escapes repo: {p}")
         return full
 
-    def read_file(self, path: str, start: int = 1, end: int = 100, **alias) -> str:
+    def _clip(self, s: str) -> str:
+        return clip(s) if self.lean else s
+
+    def read_file(self, path: str, start: int = 1, end: int | None = None, **alias) -> str:
         # models guess names like line_start/end_line; a wrong guess would cost a round trip
         for k, v in alias.items():
             if "start" in k:
@@ -41,9 +45,10 @@ class Workspace:
         self.naive = len(text)
         lines = text.splitlines()
         start = max(int(start), 1)
-        chunk = lines[start - 1 : min(int(end), start - 1 + MAX_LINES)]
+        stop = int(end) if end is not None else (start + 99 if self.lean else len(lines))
+        chunk = lines[start - 1 : min(stop, start - 1 + MAX_LINES) if self.lean else stop]
         body = "\n".join(f"{i}\t{l}" for i, l in enumerate(chunk, start))
-        return clip(body + f"\n[{len(lines)} lines total]")
+        return self._clip(body + f"\n[{len(lines)} lines total]")
 
     def search(self, pattern: str, path: str = ".") -> str:
         target = str(self._path(path))
@@ -53,7 +58,7 @@ class Workspace:
             cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
         out = subprocess.run(cmd, capture_output=True, text=True, errors="replace", cwd=self.root).stdout
         self.naive = len(out)
-        return clip(out.replace(str(self.root) + "/", "") or "no matches")
+        return self._clip(out.replace(str(self.root) + "/", "") or "no matches")
 
     def write_file(self, path: str, content: str) -> str:
         p = self._path(path)
@@ -83,7 +88,7 @@ class Workspace:
                            timeout=min(int(timeout), 120) if timeout else 120)
         raw = f"exit={r.returncode}\n{r.stdout}{r.stderr}"
         self.naive = len(raw)
-        return clip(raw)
+        return self._clip(raw)
 
 
 def unwrap(cmd: str | list) -> str | list:

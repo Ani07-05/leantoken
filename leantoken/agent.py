@@ -11,6 +11,7 @@ from .footprint import Footprint
 from .gateway import bifrost_url, groq_model, headers
 from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unrunnable
 
+SYSTEM_NAIVE = "You are a coding assistant. Use the tools to complete the task and reply when done."
 SYSTEM = (
     "You are a terse coding agent. Use search and ranged read_file, never read whole files. "
     "Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
@@ -43,8 +44,10 @@ def memory_note(turns: list[dict], cap: int = 1800) -> str:
 
 class Agent:
     def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = "", on_event=None,
-                 memory: str = "", prior_naive: int = 0):
-        self.ws = Workspace(repo)
+                 memory: str = "", prior_naive: int = 0, lean: bool = True, history: list | None = None):
+        self.lean = lean  # False: the benchmark's baseline, no token controls at all
+        self.history = history or []
+        self.ws = Workspace(repo, lean=lean)
         self.budget = budget
         self.private = private
         self.approve = approve or self._ask
@@ -91,6 +94,8 @@ class Agent:
         return input(f"\n[approve?]\n{text}\n(y/N) ").strip().lower() == "y"
 
     def _trim(self, messages: list) -> list:
+        if not self.lean:
+            return messages
         tool_idx = [i for i, m in enumerate(messages) if m["role"] == "tool"]
         old = set(tool_idx[:-KEEP_FULL])
         return [
@@ -104,7 +109,7 @@ class Agent:
     def _chat(self, messages: list, step: int = 0, retried: bool = False) -> dict:
         self.budget.check()
         body = {"model": self.model, "messages": self._trim(messages), "tools": self.tools, "max_tokens": 1024}
-        if "gpt-oss" in self.model:
+        if self.lean and "gpt-oss" in self.model:
             body["reasoning_effort"] = "low"  # hidden reasoning is billed as output tokens and counts against the minute cap
         if fallbacks := [m for m in self.fallbacks if m != self.model]:
             body["fallbacks"] = fallbacks
@@ -173,7 +178,7 @@ class Agent:
             args = json.loads(call["function"]["arguments"] or "{}")
         except json.JSONDecodeError as e:
             return f"error: bad arguments json: {e}", True
-        if name == "run_shell" and (err := unrunnable(shell_cmd(args))):
+        if self.lean and name == "run_shell" and (err := unrunnable(shell_cmd(args))):
             return err, True
         if needs_approval(name, args) and not self.approve(describe(name, args)):
             return "denied by user", False
@@ -189,11 +194,12 @@ class Agent:
     def run(self, task: str, max_steps: int = 15) -> str:
         self.fp.task = task
         prompt = f"Earlier in this session:\n{self.memory}\n\nTask: {task}" if self.memory else task
-        messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        messages = [{"role": "system", "content": SYSTEM if self.lean else SYSTEM_NAIVE}, *self.history, {"role": "user", "content": prompt}]
+        self.messages = messages
         try:
             return self._loop(messages, max_steps)
         finally:
-            sizes = [self.naive.get(m["tool_call_id"], len(m["content"])) if m["role"] == "tool" else len(json.dumps(m)) for m in messages[1:]]
+            sizes = [self.naive.get(m["tool_call_id"], len(m["content"])) if m["role"] == "tool" else len(json.dumps(m)) for m in messages[1 + len(self.history):]]
             self.turn_naive = sum(sizes) - (len(prompt) - len(task))
 
     def _loop(self, messages: list, max_steps: int) -> str:
