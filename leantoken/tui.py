@@ -29,6 +29,16 @@ HELP = """**Commands**
 **Keys**
 `ctrl+b` sidebar  `ctrl+n` new session  `ctrl+o` models  `ctrl+q` quit"""
 BAR = 20
+GOOD, BAD = "#7fd88f", "#e06c75"
+COMMANDS = {
+    "/new": "clear the session",
+    "/models": "pick the large model",
+    "/private": "toggle private mode",
+    "/budget": "set the USD limit, e.g. /budget 0.5",
+    "/sidebar": "toggle the sidebar",
+    "/help": "show help",
+    "/exit": "quit",
+}
 ACCENT, WARN, TEXT, MUTED, PANEL, BG = "#5c9cf5", "#f5a742", "#eeeeee", "#808080", "#1e1e1e", "#0a0a0a"
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -141,6 +151,8 @@ class TUI(App):
     CSS = """
     Screen { background: #0a0a0a; color: #eeeeee; }
     #body { height: 1fr; }
+    #hint { display: none; height: auto; margin-top: 1; padding: 0 2; background: #141414; border-left: heavy #1e1e1e; }
+    #hint.show { display: block; }
     #main { width: 1fr; padding: 0 2; }
     #chat { height: 1fr; scrollbar-size-vertical: 1; scrollbar-background: #0a0a0a; scrollbar-color: #1e1e1e; }
     #side { width: 34; padding: 1 2; border-left: solid #1e1e1e; color: #808080; }
@@ -159,8 +171,9 @@ class TUI(App):
     #body.home #main { align: center middle; }
     #body.home #prompt { width: 80; max-width: 100%; margin-top: 0; }
     .user { border-left: heavy #5c9cf5; padding: 1 2; margin-top: 1; background: #1e1e1e; }
-    .answer { margin: 1 0 0 0; padding: 0; }
+    .answer { margin: 1 0 0 0; padding: 0 2; border-left: heavy #2a2a2a; }
     .tool { color: #808080; margin: 0; }
+    .saved { margin: 0 0 0 2; }
     .fail { color: #e06c75; }
     .esc { color: #f5a742; }
     .diff { border-left: heavy #1e1e1e; padding: 0 1; margin: 0 0 0 2; }
@@ -178,6 +191,7 @@ class TUI(App):
         Binding("ctrl+b", "sidebar", "sidebar", priority=True),
         Binding("ctrl+n", "new", "new", priority=True),
         Binding("ctrl+o", "models", "models", priority=True),
+        Binding("tab", "complete", "complete", priority=True),
     ]
 
     def __init__(self, repo: Path, budget: Budget, private: bool, model: str, small: str):
@@ -187,14 +201,18 @@ class TUI(App):
         self.busy = False
         self.frame = 0
         self.task_tokens = 0
-        self.session = {"tokens": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.task_saved = 0.0
+        self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
         self.files: list[str] = []
+        self.matches: list[str] = []
+        self.gateway_ok: bool | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="body", classes="home"):
             with Vertical(id="main"):
                 yield Static(logo(), id="logo")
                 yield VerticalScroll(id="chat")
+                yield Static(id="hint")
                 with Vertical(id="prompt"):
                     yield Input(placeholder="Ask anything...  \"fix the failing test\"", id="input")
                     yield Static(id="mode")
@@ -204,7 +222,41 @@ class TUI(App):
     def on_mount(self) -> None:
         self.query_one("#input").focus()
         self.set_interval(0.1, self.tick)
+        self.set_interval(15, self.check_gateway)
+        self.check_gateway()
         self.call_after_refresh(self.refresh_chrome)
+
+    @work(thread=True, exclusive=True, group="health")
+    def check_gateway(self) -> None:
+        try:
+            ok = httpx.get(f"{bifrost_url()}/health", timeout=2).status_code == 200
+        except httpx.HTTPError:
+            ok = False
+        self.call_from_thread(self.set_gateway, ok)
+
+    def set_gateway(self, ok: bool) -> None:
+        self.gateway_ok = ok
+        self.refresh_chrome()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        value = event.value
+        self.matches = [c for c in COMMANDS if c.startswith(value)] if value.startswith("/") and " " not in value else []
+        hint = self.query_one("#hint", Static)
+        hint.set_class(bool(self.matches), "show")
+        if not self.matches:
+            return
+        t = Text()
+        for i, c in enumerate(self.matches):
+            t.append(f"{c:<10}", style=ACCENT if i == 0 else TEXT)
+            t.append(COMMANDS[c] + ("\n" if i < len(self.matches) - 1 else ""), style=MUTED)
+        hint.update(t)
+
+    def action_complete(self) -> None:
+        if not self.matches:
+            return
+        box = self.query_one("#input", Input)
+        box.value = self.matches[0] + " "
+        box.cursor_position = len(box.value)
 
     @property
     def chat(self) -> VerticalScroll:
@@ -243,12 +295,15 @@ class TUI(App):
         if self.busy:
             mode.append(f"{FRAMES[self.frame]} working", style=WARN)
             mode.append(f"  {self.task_tokens:,} tok", style=MUTED)
+            if self.task_saved >= 1:
+                mode.append(f"  ↓ {int(self.task_saved):,} saved", style=GOOD)
         else:
             mode.append("Build", style=ACCENT)
         mode.append(" · ", style=MUTED)
         mode.append_text(self.route())
         self.query_one("#mode", Static).update(mode)
-        left = Text(pretty_path(self.repo), style=MUTED)
+        dot = MUTED if self.gateway_ok is None else GOOD if self.gateway_ok else BAD
+        left = Text("● ", style=dot) + Text("Bifrost  " if self.gateway_ok is not False else "Bifrost down  ", style=MUTED) + Text(pretty_path(self.repo), style=MUTED)
         hints = Text()
         for key, label in (("ctrl+b", "sidebar"), ("ctrl+n", "new"), ("ctrl+o", "models"), ("ctrl+q", "quit")):
             hints.append(key + " ", style=TEXT)
@@ -263,24 +318,56 @@ class TUI(App):
 
     def sidebar(self) -> Text:
         s, spent, limit = self.session, self.budget.spent, self.budget.limit
-        filled = min(BAR, int(BAR * spent / limit)) if limit else 0
+        ratio = spent / limit if limit else 0
+        filled = min(BAR, int(BAR * ratio))
+        bar_color = GOOD if ratio < 0.6 else WARN if ratio < 0.85 else BAD
         web = not self.private and bool(os.environ.get("TAVILY_API_KEY"))
         t = Text()
-        t.append("Session\n", style="bold")
-        t.append(f"{self.repo.name}\n{s['tasks']} task(s)\n\n")
-        t.append("Context\n", style="bold")
-        t.append(f"{s['tokens'] + self.task_tokens:,} tokens\n")
+
+        def head(name: str) -> None:
+            t.append(name + "\n", style=f"bold {ACCENT}")
+
+        head("Session")
+        t.append(f"{self.repo.name}\n", style=TEXT)
+        t.append(f"{s['tasks']} task(s)\n\n")
+        used = s["tokens"] + self.task_tokens
+        saved = int(s["saved"] + self.task_saved)
+        naive = used + saved
+        head("Tokens")
+        t.append(f"used   {used:,}\n", style=TEXT)
+        if saved > 0:
+            cells = min(BAR, max(1, round(BAR * saved / naive)))
+            t.append(f"naive ~{naive:,}\n")
+            t.append(f"saved  ↓ {round(100 * saved / naive)}%\n", style=f"bold {GOOD}")
+            t.append("█" * (BAR - cells), style=ACCENT)
+            t.append("█" * cells + "\n", style=GOOD)
+            t.append("est. vs whole-file reads,\nno clipping, no trimming\n", style="#555555")
+        t.append("\n")
+        head("Budget")
         t.append(f"${spent:.4f} of ${limit:.2f}\n")
-        t.append("█" * filled, style="cyan")
-        t.append("░" * (BAR - filled) + "\n\n", style="dim")
-        t.append("Footprint\n", style="bold")
+        t.append("█" * filled, style=bar_color)
+        t.append("░" * (BAR - filled) + "\n\n", style="#2a2a2a")
+        head("Footprint")
         t.append(f"{s['kwh'] * 1000:.3f} Wh\n{s['gco2e'] * 1000:.2f} mgCO2e\n\n")
-        t.append("Mode\n", style="bold")
-        t.append(f"{'private (local only)' if self.private else 'cloud via Bifrost'}\n")
+        head("Gateway")
+        up = self.gateway_ok
+        t.append("● ", style=MUTED if up is None else GOOD if up else BAD)
+        t.append(f"{'checking' if up is None else 'connected' if up else 'unreachable'}\n")
+        t.append(f"{bifrost_url().split('//')[-1]}\n\n")
+        head("Models")
+        if self.private:
+            t.append("local only, nothing leaves\nthis machine\n\n")
+        else:
+            t.append(f"{short(self.small) if self.small else short(self.model)}\n", style=TEXT)
+            if self.small and self.small != self.model:
+                t.append(f"-> {short(self.model)}\n", style=TEXT)
+            t.append("\n")
+        head("Tools")
+        t.append("read  search  edit  shell\n")
         t.append(f"web search {'on' if web else 'off'}\n\n")
         if self.files:
-            t.append("Modified files\n", style="bold")
-            t.append("\n".join(self.files[-8:]))
+            head("Modified files")
+            t.append("\n".join(self.files[-8:]), style=TEXT)
         return t
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -333,7 +420,7 @@ class TUI(App):
             return
         self.chat.remove_children()
         self.query_one("#body").add_class("home")
-        self.session = {"tokens": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
         self.files = []
         self.refresh_chrome()
 
@@ -376,6 +463,7 @@ class TUI(App):
     def show_event(self, kind: str, d: dict) -> None:
         if kind == "call":
             self.task_tokens += d["prompt"] + d["completion"]
+            self.task_saved += d.get("saved", 0)
         elif kind == "tool":
             name, failed = d["name"], d["failed"]
             self.say(Static(Text("● ", style="red" if failed else "green") + Text(name, style="bold") + Text(f"  {brief(name, d['args'])}", style="dim")), "tool")
@@ -402,7 +490,7 @@ class TUI(App):
             self.call_from_thread(self.say, Static(str(e)), "note fail")
             self.busy = False
             return
-        self.task_tokens = 0
+        self.task_tokens, self.task_saved = 0, 0.0
         try:
             result = agent.run(task)
         except BudgetExceeded as e:
@@ -418,11 +506,16 @@ class TUI(App):
         t = agent.fp.totals()
         self.busy = False
         self.session["tokens"] += t["in"] + t["out"]
+        self.session["saved"] += t["saved_prompt"]
         self.session["kwh"] += t["kwh"]
         self.session["gco2e"] += t["gco2e"]
         self.session["tasks"] += 1
-        self.task_tokens = 0
+        self.task_tokens, self.task_saved = 0, 0.0
         self.say(Markdown(result), "answer")
+        if t["saved_prompt"] > 0:
+            win = Text("↓ ", style=f"bold {GOOD}") + Text(f"{t['saved_pct']}% fewer tokens", style=f"bold {GOOD}")
+            win.append(f"  ~{t['saved_prompt']:,} saved vs a naive agent", style=GOOD)
+            self.say(Static(win), "saved")
         line = (f"{t['in'] + t['out']:,} tok  ${t['cost_usd']:.5f}  {t['kwh'] * 1000:.3f} Wh  {t['gco2e'] * 1000:.1f} mgCO2e"
                 f"  {t['calls']} calls  {len(agent.fp.escalations)} escalations  {agent.verified}")
         self.say(Static(Text(line, style="dim")), "note")

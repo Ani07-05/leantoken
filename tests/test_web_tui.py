@@ -178,3 +178,72 @@ def test_groq_models_back_each_other_up_on_rate_limits(tmp_path, monkeypatch):
     assert sent[0]["model"] == "groq/openai/gpt-oss-20b"
     assert sent[0]["fallbacks"] == ["groq/openai/gpt-oss-120b", "groq/qwen/qwen3.8-27b"]
     assert sent[0]["reasoning_effort"] == "low"
+
+
+def test_slash_hint_lists_matches_and_tab_completes(tmp_path):
+    import asyncio
+
+    from leantoken import tui
+    from leantoken.budget import Budget
+
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+
+    async def go():
+        async with app.run_test() as pilot:
+            hint = app.query_one("#hint")
+            assert not hint.has_class("show")
+            await pilot.press("/", "m", "o")
+            assert hint.has_class("show") and app.matches == ["/models"]
+            await pilot.press("tab")
+            assert app.query_one("#input").value == "/models "
+            assert not hint.has_class("show")
+
+    asyncio.run(go())
+
+
+def test_help_command_opens_session_with_help_text(tmp_path):
+    import asyncio
+
+    from textual.widgets import Markdown
+
+    from leantoken import tui
+    from leantoken.budget import Budget
+
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press(*"/help", "enter")
+            await pilot.pause(0.2)
+            assert not app.query_one("#body").has_class("home")
+            assert any("Commands" in str(m.source) for m in app.query(Markdown))
+
+    asyncio.run(go())
+
+
+def test_savings_measure_what_a_naive_agent_would_have_sent(tmp_path):
+    from leantoken.agent import Agent
+    from leantoken.budget import Budget
+
+    (tmp_path / "big.txt").write_text("x" * 40_000)
+    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m")
+    read = {"id": "c1", "type": "function", "function": {"name": "read_file", "arguments": json.dumps({"path": "big.txt", "start": 1, "end": 3})}}
+    replies = iter([
+        {"model": "groq/m", "choices": [{"message": {"content": "", "tool_calls": [read]}}], "usage": {"prompt_tokens": 100, "completion_tokens": 5}},
+        {"model": "groq/m", "choices": [{"message": {"content": "done"}}], "usage": {"prompt_tokens": 600, "completion_tokens": 5}},
+    ])
+
+    class R:
+        status_code, text, headers = 200, "", {}
+
+        def json(self):
+            return next(replies)
+
+    agent._post = lambda body: R()
+    seen = []
+    agent.emit = lambda kind, **d: seen.append(d["saved"]) if kind == "call" else None
+    agent.run("t")
+    t = agent.fp.totals()
+    assert seen[0] == 0 and seen[1] > 0
+    assert t["saved_prompt"] > 0 and 0 < t["saved_pct"] < 100
+    assert t["naive_total"] == t["in"] + t["out"] + t["saved_prompt"]

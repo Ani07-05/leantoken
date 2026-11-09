@@ -90,6 +90,10 @@ The small model (default `groq/openai/gpt-oss-20b`) runs first. leantoken switch
 
 Each run prints a footprint report and saves it, with a per-step trace, to `<repo>/.leantoken/runs/`.
 
+## Token savings
+
+Every task reports how many prompt tokens it saved against a naive agent on the same run. The naive twin of each request reads whole files instead of line ranges, keeps tool output unclipped and never trims old tool results. We measure the size of each tool output both ways, then convert the extra characters to tokens at that request's real tokens-per-character ratio (from the API's `usage`). Output tokens are not counted as saved. The shorter system prompt and tool schemas are not counted either, so the figure is conservative. It is an estimate of one run, not a benchmark: the benchmark against a real naive agent is separate.
+
 ## Measurement
 
 Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inference/) LLM inference formula: GPU energy from active parameters and output tokens, server energy from request latency, times PUE 1.2. Carbon is energy times the grid intensity of the Groq region that served the call (`X-Groq-Region`; Our World in Data 2023). EcoLogits does not cover Groq and models H100 servers, not Groq LPUs, and it ignores input tokens for GPU energy, so the numbers are comparable estimates, not measurements. Cost uses Groq list prices; Bifrost's logs hold the authoritative cost. Results are reported per completed task. A task only counts if its tests pass, and an escalated step is charged for both models. Benchmark numbers will be added here once the run is done; no savings are claimed before that.
