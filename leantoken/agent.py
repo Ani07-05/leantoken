@@ -5,7 +5,8 @@ from pathlib import Path
 
 import httpx
 
-from .budget import Budget
+from .budget import Budget, BudgetExceeded
+from .gateway import bifrost_url, groq_model, headers
 from .tools import SCHEMAS, Workspace, describe, needs_approval
 
 SYSTEM = (
@@ -20,21 +21,26 @@ class Usage:
     prompt: int = 0
     completion: int = 0
     calls: int = 0
+    fallbacks: int = 0
     models: dict = field(default_factory=dict)
 
 
 class Agent:
-    def __init__(self, repo: Path, budget: Budget, private: bool, approve=None):
+    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None):
         self.ws = Workspace(repo)
         self.budget = budget
         self.private = private
         self.approve = approve or self._ask
-        self.base = os.environ.get("BIFROST_URL", "http://localhost:8080")
-        self.model = os.environ.get("LEANTOKEN_MODEL", "openai/gpt-4o-mini")
-        self.local_model = os.environ.get("LEANTOKEN_LOCAL_MODEL", "ollama/qwen2.5-coder:7b")
-        self.fallbacks = [
-            m for m in os.environ.get("LEANTOKEN_FALLBACKS", "anthropic/claude-haiku-4-5-20251001").split(",") if m
-        ]
+        self.base = bifrost_url()
+        self.headers = headers(private)
+        if private:
+            # private repos never leave the machine: local model, no cloud fallback;
+            # the private virtual key also blocks any other provider at the gateway
+            self.model = "ollama/" + os.environ.get("LEANTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
+            self.fallbacks = []
+        else:
+            self.model = groq_model(model)
+            self.fallbacks = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
         self.usage = Usage()
 
     @staticmethod
@@ -49,36 +55,41 @@ class Agent:
             for i, m in enumerate(messages)
         ]
 
+    def _post(self, body: dict) -> httpx.Response:
+        return httpx.post(f"{self.base}/v1/chat/completions", json=body, headers=self.headers, timeout=180)
+
     def _chat(self, messages: list) -> dict:
         self.budget.check()
-        # private repos never leave the machine: no cloud model, no cloud fallback
-        body = {
-            "model": self.local_model if self.private else self.model,
-            "messages": self._trim(messages),
-            "tools": SCHEMAS,
-            "max_tokens": 1024,
-        }
-        if self.fallbacks and not self.private:
+        body = {"model": self.model, "messages": self._trim(messages), "tools": SCHEMAS, "max_tokens": 1024}
+        if self.fallbacks:
             body["fallbacks"] = self.fallbacks
-        headers = {}
-        if vk := os.environ.get("BIFROST_VK"):
-            headers["x-bf-vk"] = vk
-        r = httpx.post(f"{self.base}/v1/chat/completions", json=body, headers=headers, timeout=120)
+        r = self._post(body)
+        if r.status_code >= 400 and "budget_exceeded" in r.text:
+            raise BudgetExceeded("Bifrost virtual key budget used up")
         r.raise_for_status()
         data = r.json()
         u = data.get("usage", {})
         pt, ct = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
-        model = data.get("model", body["model"])
-        self.budget.charge(model if "/" in model else body["model"], pt, ct)
+        model = data.get("model") or self.model
+        self.budget.charge(model, pt, ct, local=self.private)
         self.usage.prompt += pt
         self.usage.completion += ct
         self.usage.calls += 1
+        self.usage.fallbacks += r.headers.get("x-bifrost-routing-info-is-fallback") == "true"
         self.usage.models[model] = self.usage.models.get(model, 0) + 1
-        return data["choices"][0]["message"]
+        msg = data["choices"][0]["message"]
+        # extras like "reasoning" would only cost tokens on the next call
+        clean = {"role": "assistant", "content": msg.get("content") or ""}
+        if msg.get("tool_calls"):
+            clean["tool_calls"] = msg["tool_calls"]
+        return clean
 
     def _run_tool(self, call: dict) -> str:
         name = call["function"]["name"]
-        args = json.loads(call["function"]["arguments"] or "{}")
+        try:
+            args = json.loads(call["function"]["arguments"] or "{}")
+        except json.JSONDecodeError as e:
+            return f"error: bad arguments json: {e}"
         if needs_approval(name, args) and not self.approve(describe(name, args)):
             return "denied by user"
         try:
@@ -92,7 +103,7 @@ class Agent:
             msg = self._chat(messages)
             messages.append(msg)
             if not msg.get("tool_calls"):
-                return msg.get("content") or ""
+                return msg["content"]
             for call in msg["tool_calls"]:
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": self._run_tool(call)})
         return "step limit reached"
