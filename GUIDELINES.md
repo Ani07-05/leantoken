@@ -48,4 +48,5 @@ cp .env.example .env
 leantoken --pick-model
 leantoken "task" --repo path/to/repo --budget 0.50
 leantoken "task" --private
+leantoken "task" --no-route   # large model only, the baseline arm
 ```

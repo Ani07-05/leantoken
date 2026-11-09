@@ -51,13 +51,14 @@ def _reply(model="groq/openai/gpt-oss-120b"):
     return {"model": model, "choices": [{"message": msg}], "usage": {"prompt_tokens": 100, "completion_tokens": 10}}
 
 
-def _agent(tmp_path, monkeypatch, private=False, responses=None):
+def _agent(tmp_path, monkeypatch, private=False, responses=None, small=""):
     from leantoken.agent import Agent
 
     monkeypatch.setenv("BIFROST_VK", "sk-bf-user")
     monkeypatch.setenv("BIFROST_PRIVATE_VK", "sk-bf-private")
     monkeypatch.setenv("LEANTOKEN_FALLBACKS", "openai/gpt-4o-mini")
-    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), private, "openai/gpt-oss-120b", approve=lambda _: True)
+    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), private, "openai/gpt-oss-120b",
+                  approve=lambda _: True, small=small)
     sent = []
 
     def post(body):
@@ -104,4 +105,104 @@ def test_fallback_counted_and_reasoning_dropped(tmp_path, monkeypatch):
     fb = FakeResponse(body=_reply("openai/gpt-4o-mini"), headers={"x-bifrost-routing-info-is-fallback": "true"})
     agent, _ = _agent(tmp_path, monkeypatch, responses=[fb])
     assert agent._chat([]) == {"role": "assistant", "content": "done"}
-    assert agent.usage.fallbacks == 1 and agent.usage.models == {"openai/gpt-4o-mini": 1}
+    assert agent.fp.fallbacks == 1 and list(agent.fp.totals()["by_model"]) == ["openai/gpt-4o-mini"]
+
+
+SMALL = "openai/gpt-oss-20b"
+
+
+def _tool_reply(model, name, args):
+    call = {"id": "c1", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+    msg = {"content": "", "tool_calls": [call]}
+    return FakeResponse(body={"model": model, "choices": [{"message": msg}], "usage": {"prompt_tokens": 50, "completion_tokens": 5}})
+
+
+def test_small_model_first_and_no_escalation_when_fine(tmp_path, monkeypatch):
+    agent, sent = _agent(tmp_path, monkeypatch, small=SMALL)
+    agent.run("task")
+    assert sent[0]["model"] == "groq/openai/gpt-oss-20b" and agent.fp.escalations == []
+
+
+def test_escalates_on_provider_400_and_retries_large(tmp_path, monkeypatch):
+    bad = FakeResponse(400, text='{"error":{"code":"tool_use_failed"}}')
+    agent, sent = _agent(tmp_path, monkeypatch, responses=[bad], small=SMALL)
+    assert agent.run("task") == "done"
+    assert [b["model"] for b in sent] == ["groq/openai/gpt-oss-20b", "groq/openai/gpt-oss-120b"]
+    assert agent.fp.escalations[0]["reason"] == "provider rejected small model output"
+
+
+def test_escalates_after_repeated_tool_errors_and_stays_large(tmp_path, monkeypatch):
+    bad = [_tool_reply(SMALL, "read_file", {"path": "missing.py"}) for _ in range(2)]
+    agent, sent = _agent(tmp_path, monkeypatch, responses=bad, small=SMALL)
+    agent.run("task")
+    assert [b["model"].split("-")[-1] for b in sent] == ["20b", "20b", "120b"]
+    assert len(agent.fp.escalations) == 1
+
+
+def test_done_with_failing_tests_escalates(tmp_path, monkeypatch):
+    (tmp_path / "a.txt").write_text("x")
+    steps = [_tool_reply(SMALL, "edit_file", {"path": "a.txt", "old": "x", "new": "y"}),
+             _tool_reply(SMALL, "run_shell", {"cmd": "python -c \"import sys; sys.exit(1)\" # pytest"}),
+             FakeResponse(body=_reply(SMALL))]
+    agent, sent = _agent(tmp_path, monkeypatch, responses=steps, small=SMALL)
+    agent.run("task")
+    assert agent.fp.escalations[0]["reason"] == "finished with tests failing"
+    assert sent[-1]["model"] == "groq/openai/gpt-oss-120b"
+
+
+def test_no_route_uses_large_only(tmp_path, monkeypatch):
+    agent, sent = _agent(tmp_path, monkeypatch)
+    agent.run("task")
+    assert sent[0]["model"] == "groq/openai/gpt-oss-120b" and not agent.on_small
+
+
+def test_footprint_energy_and_report(tmp_path):
+    from leantoken.footprint import Footprint, energy_kwh, gpus
+
+    assert gpus(117) == 4 and gpus(21) == 1
+    assert energy_kwh("groq/openai/gpt-oss-120b", 100, 1.0) > energy_kwh("groq/openai/gpt-oss-20b", 100, 1.0) > 0
+    fp = Footprint("t")
+    fp.add("groq/openai/gpt-oss-20b", 1000, 100, 0.5)
+    t = fp.totals()
+    assert t["in"] == 1000 and t["gco2e"] > 0 and t["cost_usd"] > 0
+    assert "mgCO2e" in fp.report("done", "tests passing")
+    saved = json.loads(fp.save(tmp_path, "done", "tests passing").read_text())
+    assert saved["totals"]["calls"] == 1
+
+
+def test_rate_limit_waits_then_retries(tmp_path, monkeypatch):
+    import leantoken.agent as agent_mod
+
+    monkeypatch.setattr(agent_mod.time, "sleep", lambda s: None)
+    limited = FakeResponse(429, text="rate limited", headers={"x-bifrost-retry-after-ms": "2000"})
+    agent, sent = _agent(tmp_path, monkeypatch, responses=[limited])
+    assert agent.run("task") == "done"
+    assert len(sent) == 2 and agent.fp.rate_limit_wait_s == 2
+
+
+def test_edit_tolerates_tab_indent(tmp_path):
+    (tmp_path / "a.py").write_text("def f():\n    return 1\n")
+    assert Workspace(tmp_path).edit_file("a.py", "\treturn 1", "\treturn 2") == "edited a.py"
+    assert (tmp_path / "a.py").read_text() == "def f():\n    return 2\n"
+
+
+def test_grid_follows_groq_region():
+    from leantoken.footprint import Footprint
+
+    fp = Footprint("t")
+    mumbai = fp.add("groq/openai/gpt-oss-20b", 100, 100, 1.0, region="bom")
+    unknown = fp.add("groq/openai/gpt-oss-20b", 100, 100, 1.0)
+    assert mumbai.gco2e > unknown.gco2e
+
+
+def test_read_file_accepts_guessed_range_names(tmp_path):
+    (tmp_path / "a.txt").write_text("1\n2\n3\n")
+    assert Workspace(tmp_path).read_file("a.txt", line_start=2, line_end=2).startswith("2\t2")
+
+
+def test_bash_wrapper_unwrapped():
+    from leantoken.tools import unwrap
+
+    assert unwrap(["bash", "-lc", "pytest -q"]) == "pytest -q"
+    assert unwrap(["python", "-m", "pytest"]) == ["python", "-m", "pytest"]
+    assert not needs_approval("run_shell", {"cmd": ["bash", "-lc", "git status"]})

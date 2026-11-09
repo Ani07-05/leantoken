@@ -1,9 +1,11 @@
+import os
 import re
 import shutil
 import subprocess
 from pathlib import Path
 
 MAX_OUT = 3000
+SHELL = "Windows cmd.exe" if os.name == "nt" else "POSIX sh"
 SAFE_CMD = re.compile(r"^(git (status|diff|log|show|branch)|ls|pwd|cat|head|tail|wc)\b[^;&|><`$]*$")
 
 
@@ -23,7 +25,15 @@ class Workspace:
             raise ValueError(f"path escapes repo: {p}")
         return full
 
-    def read_file(self, path: str, start: int = 1, end: int = 200) -> str:
+    def read_file(self, path: str, start: int = 1, end: int = 200, **alias) -> str:
+        # models guess names like line_start/end_line; a wrong guess would cost a round trip
+        for k, v in alias.items():
+            if "start" in k:
+                start = v
+            elif "end" in k:
+                end = v
+            else:
+                raise TypeError(f"unexpected argument {k}; use path, start, end")
         lines = self._path(path).read_text(errors="replace").splitlines()
         chunk = lines[max(start - 1, 0) : end]
         body = "\n".join(f"{i}\t{l}" for i, l in enumerate(chunk, start))
@@ -34,7 +44,7 @@ class Workspace:
         if shutil.which("rg"):
             cmd = ["rg", "-n", "--no-heading", "-m", "5", pattern, target]
         else:
-            cmd = ["grep", "-rn", "-m", "5", pattern, target]
+            cmd = ["grep", "-rn", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
         out = subprocess.run(cmd, capture_output=True, text=True, cwd=self.root).stdout
         return clip(out.replace(str(self.root) + "/", "") or "no matches")
 
@@ -47,21 +57,38 @@ class Workspace:
     def edit_file(self, path: str, old: str, new: str) -> str:
         p = self._path(path)
         text = p.read_text()
+        if text.count(old) == 0 and "	" in old:  # models often re-indent with tabs
+            old, new = old.expandtabs(4), new.expandtabs(4)
         if text.count(old) != 1:
             return f"error: old string matched {text.count(old)} times, need exactly 1"
         p.write_text(text.replace(old, new))
         return f"edited {path}"
 
-    def run_shell(self, cmd: str) -> str:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=self.root, timeout=120)
+    def run_shell(self, cmd: str | list, timeout: int = 120) -> str:
+        cmd = unwrap(cmd)
+        # models sometimes send argv; run it as argv rather than re-quoting it
+        r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, cwd=self.root,
+                           timeout=min(int(timeout), 120) if timeout else 120)
         return clip(f"exit={r.returncode}\n{r.stdout}{r.stderr}")
+
+
+def unwrap(cmd: str | list) -> str | list:
+    """["bash", "-lc", "pytest"] -> "pytest": models assume Linux, but on Windows bash is WSL without the repo's tools."""
+    if isinstance(cmd, list) and len(cmd) == 3 and Path(cmd[0]).name in ("bash", "sh", "zsh") and cmd[1] in ("-c", "-lc"):
+        return cmd[2]
+    return cmd
+
+
+def shell_cmd(args: dict) -> str:
+    cmd = unwrap(args.get("cmd", ""))
+    return " ".join(cmd) if isinstance(cmd, list) else str(cmd)
 
 
 def needs_approval(name: str, args: dict) -> bool:
     if name in ("read_file", "search"):
         return False
     if name == "run_shell":
-        return not SAFE_CMD.match(args.get("cmd", ""))
+        return not SAFE_CMD.match(shell_cmd(args))
     return True
 
 
@@ -70,7 +97,7 @@ def describe(name: str, args: dict) -> str:
         return f"edit {args['path']}\n- {args['old']}\n+ {args['new']}"
     if name == "write_file":
         return f"write {args['path']} ({len(args['content'])} bytes)"
-    return f"shell: {args.get('cmd')}"
+    return f"shell: {shell_cmd(args)}"
 
 
 def _fn(name, desc, props, required):
@@ -86,10 +113,11 @@ def _fn(name, desc, props, required):
 
 S = {"type": "string"}
 I = {"type": "integer"}
+CMD = {"anyOf": [S, {"type": "array", "items": S}]}
 SCHEMAS = [
     _fn("read_file", "Read a line range of a file.", {"path": S, "start": I, "end": I}, ["path"]),
     _fn("search", "Regex search, max 5 hits per file.", {"pattern": S, "path": S}, ["pattern"]),
     _fn("edit_file", "Replace one exact unique string in a file.", {"path": S, "old": S, "new": S}, ["path", "old", "new"]),
     _fn("write_file", "Create or overwrite a file.", {"path": S, "content": S}, ["path", "content"]),
-    _fn("run_shell", "Run a shell command (tests, git).", {"cmd": S}, ["cmd"]),
+    _fn("run_shell", f"Run a {SHELL} command string from the repo root (tests, git).", {"cmd": CMD, "timeout": I}, ["cmd"]),
 ]

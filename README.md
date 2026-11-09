@@ -44,8 +44,8 @@ leantoken CLI ──> Bifrost gateway ──> Groq        (default)
 | Agent loop, tools, approval gate, context trimming | Done |
 | Groq model picker (via Bifrost) | Done |
 | All calls through Bifrost | Done |
-| Small-first routing | Planned |
-| Footprint report | Planned |
+| Small-first routing | Done |
+| Footprint report | Done |
 | Benchmark vs a naive agent | Planned |
 | Tavily docs lookup | Planned |
 
@@ -75,11 +75,22 @@ leantoken --pick-model         # choose a Groq model
 leantoken "fix the failing test in tests/test_api.py" --repo path/to/repo
 leantoken "add input validation to create_user" --budget 0.50
 leantoken "rename Config to Settings" --private
+leantoken "..." --model groq/openai/gpt-oss-120b --small groq/openai/gpt-oss-20b
+leantoken "..." --no-route     # large model only
 ```
+
+The small model (default `groq/openai/gpt-oss-20b`) runs first. leantoken switches to the large model for the rest of the task when:
+- the small model is not done after 8 steps
+- 2 tool calls in a row fail
+- tests fail twice after an edit
+- it says it is done while tests still fail
+- Groq rejects its tool call
+
+Each run prints a footprint report and saves it, with a per-step trace, to `<repo>/.leantoken/runs/`.
 
 ## Measurement
 
-Energy is estimated from model size and tokens with the EcoLogits method; carbon is energy times grid intensity. Results are reported per completed task. A task only counts if its tests pass, and an escalated step is charged for both models. Benchmark numbers will be added here once the run is done; no savings are claimed before that.
+Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inference/) LLM inference formula: GPU energy from active parameters and output tokens, server energy from request latency, times PUE 1.2. Carbon is energy times the grid intensity of the Groq region that served the call (`X-Groq-Region`; Our World in Data 2023). EcoLogits does not cover Groq and models H100 servers, not Groq LPUs, and it ignores input tokens for GPU energy, so the numbers are comparable estimates, not measurements. Cost uses Groq list prices; Bifrost's logs hold the authoritative cost. Results are reported per completed task. A task only counts if its tests pass, and an escalated step is charged for both models. Benchmark numbers will be added here once the run is done; no savings are claimed before that.
 
 ## Tech
 

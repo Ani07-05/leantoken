@@ -1,11 +1,13 @@
 import json
 import os
-from dataclasses import dataclass, field
+import re
+import time
 from pathlib import Path
 
 import httpx
 
 from .budget import Budget, BudgetExceeded
+from .footprint import Footprint
 from .gateway import bifrost_url, groq_model, headers
 from .tools import SCHEMAS, Workspace, describe, needs_approval
 
@@ -14,19 +16,17 @@ SYSTEM = (
     "Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
 )
 KEEP_FULL = 4
-
-
-@dataclass
-class Usage:
-    prompt: int = 0
-    completion: int = 0
-    calls: int = 0
-    fallbacks: int = 0
-    models: dict = field(default_factory=dict)
+RATE_LIMIT_WAITS = 4  # Groq free tier allows 8k tokens/min on the large model
+# right-size routing: the small model handles the task until one of these trips, then the large one finishes it
+SMALL_MAX_STEPS = 8  # small model still not done after this many steps
+LARGE_STEPS = 10  # steps the large model gets after an escalation
+MAX_TOOL_ERRORS = 2  # consecutive invalid tool calls or tool errors
+MAX_TEST_FAILS = 2  # failing test runs after the first edit
+TEST_CMD = re.compile(r"\b(pytest|unittest|tox|nox|jest|vitest|mocha|(npm|pnpm|yarn|cargo|go|dotnet|mvn|gradle) test)\b")
 
 
 class Agent:
-    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None):
+    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = ""):
         self.ws = Workspace(repo)
         self.budget = budget
         self.private = private
@@ -38,10 +38,26 @@ class Agent:
             # the private virtual key also blocks any other provider at the gateway
             self.model = "ollama/" + os.environ.get("LEANTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
             self.fallbacks = []
+            self.large = self.model
         else:
-            self.model = groq_model(model)
+            self.large = groq_model(model)
+            self.model = groq_model(small) if small else self.large
             self.fallbacks = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
-        self.usage = Usage()
+        self.fp = Footprint("")
+        self.verified = "no tests run"
+        self.step_limit = 15
+
+    @property
+    def on_small(self) -> bool:
+        return self.model != self.large
+
+    def escalate(self, step: int, reason: str) -> bool:
+        if not self.on_small:
+            return False
+        self.fp.escalations.append({"step": step, "from": self.model, "to": self.large, "reason": reason})
+        self.model = self.large
+        self.step_limit = max(self.step_limit, step + LARGE_STEPS)
+        return True
 
     @staticmethod
     def _ask(text: str) -> bool:
@@ -58,25 +74,43 @@ class Agent:
     def _post(self, body: dict) -> httpx.Response:
         return httpx.post(f"{self.base}/v1/chat/completions", json=body, headers=self.headers, timeout=180)
 
-    def _chat(self, messages: list) -> dict:
+    def _chat(self, messages: list, step: int = 0, retried: bool = False) -> dict:
         self.budget.check()
         body = {"model": self.model, "messages": self._trim(messages), "tools": SCHEMAS, "max_tokens": 1024}
         if self.fallbacks:
             body["fallbacks"] = self.fallbacks
-        r = self._post(body)
+        for _ in range(RATE_LIMIT_WAITS + 1):
+            t0 = time.perf_counter()
+            r = self._post(body)
+            latency = time.perf_counter() - t0
+            if r.status_code != 429 or "budget_exceeded" in r.text:
+                break
+            wait = min(60.0, float(r.headers.get("x-bifrost-retry-after-ms") or 15000) / 1000)
+            print(f"[rate limited, waiting {wait:.0f}s]")
+            self.fp.rate_limit_wait_s += wait
+            time.sleep(wait)
         if r.status_code >= 400 and "budget_exceeded" in r.text:
             raise BudgetExceeded("Bifrost virtual key budget used up")
-        r.raise_for_status()
+        # Groq answers 400 when a model emits a malformed tool call: escalate, or resample once on the large model
+        if r.status_code == 400:
+            if self.escalate(step, "provider rejected small model output"):
+                return self._chat(messages, step)
+            if not retried:
+                return self._chat(messages, step, retried=True)
+            if "tool_use_failed" in r.text:
+                # show the model its schema error instead of failing the task
+                err = r.json().get("error", {}).get("message", "invalid tool call")[:300]
+                return {"role": "user", "content": f"Your tool call was rejected: {err}. Retry with valid arguments."}
+        if r.status_code >= 400:
+            raise RuntimeError(f"Bifrost {r.status_code}: {r.text[:400]}")
         data = r.json()
         u = data.get("usage", {})
         pt, ct = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
         model = data.get("model") or self.model
         self.budget.charge(model, pt, ct, local=self.private)
-        self.usage.prompt += pt
-        self.usage.completion += ct
-        self.usage.calls += 1
-        self.usage.fallbacks += r.headers.get("x-bifrost-routing-info-is-fallback") == "true"
-        self.usage.models[model] = self.usage.models.get(model, 0) + 1
+        region = data.get("extra_fields", {}).get("provider_response_headers", {}).get("X-Groq-Region", "")
+        self.fp.add(model, pt, ct, latency, local=self.private, region=region)
+        self.fp.fallbacks += r.headers.get("x-bifrost-routing-info-is-fallback") == "true"
         msg = data["choices"][0]["message"]
         # extras like "reasoning" would only cost tokens on the next call
         clean = {"role": "assistant", "content": msg.get("content") or ""}
@@ -84,26 +118,62 @@ class Agent:
             clean["tool_calls"] = msg["tool_calls"]
         return clean
 
-    def _run_tool(self, call: dict) -> str:
+    def _run_tool(self, call: dict) -> tuple[str, bool]:
+        """Returns the tool output and whether the call failed."""
         name = call["function"]["name"]
+        if not hasattr(Workspace, name) or name.startswith("_"):
+            return f"error: unknown tool {name}", True
         try:
             args = json.loads(call["function"]["arguments"] or "{}")
         except json.JSONDecodeError as e:
-            return f"error: bad arguments json: {e}"
+            return f"error: bad arguments json: {e}", True
         if needs_approval(name, args) and not self.approve(describe(name, args)):
-            return "denied by user"
+            return "denied by user", False
         try:
-            return getattr(self.ws, name)(**args)
+            out = getattr(self.ws, name)(**args)
         except Exception as e:
-            return f"error: {e}"
+            return f"error: {e}", True
+        return out, out.startswith("error:")
 
     def run(self, task: str, max_steps: int = 15) -> str:
+        self.fp.task = task
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task}]
-        for _ in range(max_steps):
-            msg = self._chat(messages)
+        tool_errors = test_fails = 0
+        last_error = ""
+        edited = False
+        self.step_limit = max_steps
+        step = 0
+        while step < self.step_limit:
+            step += 1
+            if self.on_small and step > SMALL_MAX_STEPS:
+                self.escalate(step, f"small model not done after {SMALL_MAX_STEPS} steps")
+            msg = self._chat(messages, step)
             messages.append(msg)
+            if msg["role"] == "user":
+                tool_errors += 1
+                continue
             if not msg.get("tool_calls"):
+                # a small model claiming success over failing tests gets a second opinion
+                if self.verified == "tests failing" and self.escalate(step, "finished with tests failing"):
+                    messages.append({"role": "user", "content": "Tests still fail. Fix them."})
+                    continue
                 return msg["content"]
             for call in msg["tool_calls"]:
-                messages.append({"role": "tool", "tool_call_id": call["id"], "content": self._run_tool(call)})
+                out, failed = self._run_tool(call)
+                name = call["function"]["name"]
+                if name in ("edit_file", "write_file") and not failed:
+                    edited = True
+                if name == "run_shell" and out.startswith("exit=") and TEST_CMD.search(json.dumps(call["function"]["arguments"])):
+                    ok = out.startswith("exit=0")
+                    self.verified = "tests passing" if ok else "tests failing"
+                    test_fails += edited and not ok
+                tool_errors = tool_errors + 1 if failed else 0
+                last_error = out[:120] if failed else ""
+                messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
+                self.fp.trace.append({"step": step, "model": self.model, "tool": name,
+                                      "args": call["function"]["arguments"][:120], "out": out[:120]})
+            if tool_errors >= MAX_TOOL_ERRORS:
+                self.escalate(step, f"{tool_errors} tool errors in a row ({last_error})")
+            if test_fails >= MAX_TEST_FAILS:
+                self.escalate(step, f"tests failed {test_fails} times after edits")
         return "step limit reached"
