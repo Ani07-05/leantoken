@@ -344,7 +344,7 @@ def test_recursive_ls_is_refused_with_a_hint():
     from leantoken.tools import unrunnable
 
     for cmd in ("ls -R", "ls -laR src", "ls --recursive"):
-        assert "Use search" in unrunnable(cmd), cmd
+        assert "Use list_files" in unrunnable(cmd), cmd
     assert unrunnable("ls -la src") is None
 
 

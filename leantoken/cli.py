@@ -3,23 +3,12 @@ import os
 import sys
 from pathlib import Path
 
+from . import config
 from .agent import Agent
 from .budget import Budget, BudgetExceeded
-from .gateway import pick_model, resolve_model
+from .gateway import DEFAULT_SMALL, pick_model, resolve_model, resolve_small, saved_model
 from .tui import TUI
 
-DEFAULT_SMALL = "groq/openai/gpt-oss-20b"
-
-
-def load_env(path: Path) -> None:
-    """Minimal .env loader; real environment variables win."""
-    if not path.is_file():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
 
 
 def plain_event(kind: str, **d) -> None:
@@ -30,20 +19,24 @@ def plain_event(kind: str, **d) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(prog="leantoken")
+    # Windows consoles choke on emoji in model replies
+    sys.stdout.reconfigure(errors="replace")
+    config.load_all()
+    if sys.argv[1:2] == ["config"]:
+        config.main(sys.argv[2:])
+        return
+    ap = argparse.ArgumentParser(prog="leantoken", epilog="settings: leantoken config [list|set|unset|edit|path]")
     ap.add_argument("task", nargs="?")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--model", help="large Groq model via Bifrost (default: LEANTOKEN_MODEL or your saved pick)")
-    ap.add_argument("--small", help=f"small model tried first (default: LEANTOKEN_SMALL_MODEL or {DEFAULT_SMALL})")
+    ap.add_argument("--small", help=f"first model, tried before the large one (default: LEANTOKEN_SMALL_MODEL, your saved pick or {DEFAULT_SMALL})")
     ap.add_argument("--no-route", action="store_true", help="use only the large model")
-    ap.add_argument("--pick-model", action="store_true", help="list Groq models and save your choice")
+    ap.add_argument("--pick-model", action="store_true", help="pick the large and first models and save them")
     ap.add_argument("--budget", type=float, default=0.50, help="USD limit, persisted across runs")
     ap.add_argument("--private", action="store_true", help="local model only, nothing leaves the machine")
     a = ap.parse_args()
-    # Windows consoles choke on emoji in model replies
-    sys.stdout.reconfigure(errors="replace")
-
-    load_env(Path.cwd() / ".env")
+    if a.task and not os.environ.get("BIFROST_VK") and not a.private:
+        print(f"note: BIFROST_VK is not set. Run `leantoken config set BIFROST_VK <key>` ({config.GLOBAL_ENV})")
     if a.pick_model:
         pick_model()
         if not a.task:
@@ -53,8 +46,9 @@ def main() -> None:
 
     repo = Path(a.repo).resolve()
     private = a.private or (repo / ".leantoken-private").exists()
-    model = resolve_model(a.model)
-    small = "" if a.no_route else (a.small or os.environ.get("LEANTOKEN_SMALL_MODEL") or DEFAULT_SMALL)
+    # the TUI opens settings and the model picker itself, so don't block on them here
+    model = resolve_model(a.model) if a.task else (a.model or os.environ.get("LEANTOKEN_MODEL") or saved_model() or "")
+    small = "" if a.no_route else resolve_small(a.small)
     budget = Budget(repo / ".leantoken" / "budget.json", a.budget)
     if not a.task:
         TUI(repo, budget, private, model, small).loop()

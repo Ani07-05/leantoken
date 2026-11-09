@@ -13,9 +13,20 @@ from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unru
 
 SYSTEM_NAIVE = "You are a coding assistant. Use the tools to complete the task and reply when done."
 SYSTEM = (
-    "You are a terse coding agent. Use search and ranged read_file, never read whole files. "
+    "You are a terse coding agent. Use list_files, search and ranged read_file, never read whole files. "
     "Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
 )
+# a question gets no write tools, so asking about the code can never change it
+SYSTEM_ASK = (
+    "You answer questions about a code repo. Use list_files, search and ranged read_file; read only what you need. "
+    "Do not change files. Answer in a few short sentences or bullets."
+)
+ASK = re.compile(r"^(what|why|how|where|which|who|when|explain|describe|summari[sz]e|tell me|show me|walk me|"
+                 r"give me an overview|is|are|does|do|can you (explain|tell|describe|summari[sz]e|show))\b", re.I)
+CHANGE = re.compile(r"\b(fix|add|change|edit|write|create|implement|refactor|rename|remove|delete|update|make|build|"
+                    r"generate|replace|convert|install|migrate|bump|commit)\b", re.I)
+
+
 KEEP_FULL = 2  # older tool results shrink to a stub; every kept result is re-sent on every later call
 ELIDE_TO = 120
 # the naive twin gets a generous output cap too, so one giant listing cannot inflate the savings figure
@@ -29,6 +40,12 @@ LARGE_STEPS = 10  # steps the large model gets after an escalation
 MAX_TOOL_ERRORS = 2  # consecutive invalid tool calls or tool errors
 MAX_TEST_FAILS = 2  # failing test runs after the first edit
 TEST_CMD = re.compile(r"\b(pytest|unittest|tox|nox|jest|vitest|mocha|(npm|pnpm|yarn|cargo|go|dotnet|mvn|gradle) test)\b")
+
+
+def is_question(task: str) -> bool:
+    """A request that only asks about the code, e.g. "what is this repo about?"."""
+    t = task.strip()
+    return bool(ASK.match(t) or t.endswith("?")) and not CHANGE.search(t)
 
 
 def memory_note(turns: list[dict], cap: int = 1800) -> str:
@@ -193,8 +210,11 @@ class Agent:
 
     def run(self, task: str, max_steps: int = 15) -> str:
         self.fp.task = task
+        ask = self.lean and is_question(task)
+        if ask:
+            self.tools = schemas(web=any(t["function"]["name"] == "web_search" for t in self.tools), read_only=True)
         prompt = f"Earlier in this session:\n{self.memory}\n\nTask: {task}" if self.memory else task
-        messages = [{"role": "system", "content": SYSTEM if self.lean else SYSTEM_NAIVE}, *self.history, {"role": "user", "content": prompt}]
+        messages = [{"role": "system", "content": SYSTEM_ASK if ask else SYSTEM if self.lean else SYSTEM_NAIVE}, *self.history, {"role": "user", "content": prompt}]
         self.messages = messages
         try:
             return self._loop(messages, max_steps)

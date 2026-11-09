@@ -1,0 +1,62 @@
+name: build
+
+# Builds standalone binaries: Windows .exe, macOS .dmg (Apple Silicon + Intel), Linux.
+# Every run uploads them as workflow artifacts; pushing a v* tag also attaches them to a GitHub release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+          - os: macos-latest
+            name: macos-arm64
+          - os: macos-15-intel
+            name: macos-x64
+          - os: ubuntu-latest
+            name: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev,build]"
+      - run: python -m pytest -q
+      - run: python build_exe.py
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv dist/leantoken.exe dist/leantoken-windows-x64.exe
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: bash packaging/make_dmg.sh ${{ matrix.name == 'macos-arm64' && 'arm64' || 'x64' }}
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf dist/leantoken-linux-x64.tar.gz -C dist leantoken
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leantoken-${{ matrix.name }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.tar.gz
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.tar.gz

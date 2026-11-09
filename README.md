@@ -47,14 +47,19 @@ In the Bifrost UI:
 3. For private repos, add Ollama and a second key that allows only Ollama.
 
 ```
-cp .env.example .env           # set BIFROST_VK (and BIFROST_PRIVATE_VK)
-leantoken --pick-model         # choose a Groq model
+leantoken                      # first run opens Settings: paste your virtual key, ctrl+s, pick a model
 ```
+
+Settings live in `~/.leantoken/.env`, so leantoken works from any folder. A `.env` in the current folder overrides them, and real environment variables override both. `leantoken config` lists the values in effect and where each comes from (secrets masked); `config set|unset|edit|path` change them; inside the TUI, `/settings` or `ctrl+s` opens the settings page.
+
+**Standalone executable.** `pip install -e '.[build]' && python build_exe.py` writes a single `dist/leantoken.exe` (or `dist/leantoken` on Linux/macOS) that needs no Python. Put it on your PATH; Bifrost still has to be running.
+
+**Downloads for every OS.** The `build` GitHub Action (run it from the Actions tab, or push a `v*` tag) builds `leantoken-windows-x64.exe`, `leantoken-macos-arm64.dmg`, `leantoken-macos-x64.dmg` and `leantoken-linux-x64.tar.gz`; a tag also attaches them to the release. On a Mac, open the .dmg and double-click `install.command`; the binary is unsigned, so if macOS blocks it, right-click it and choose Open.
 
 ## Usage
 
 ```
-leantoken                      # full-screen TUI: /help, !cmd, ctrl+b sidebar, ctrl+o models
+leantoken                      # full-screen TUI: /help, !cmd, ctrl+b sidebar, ctrl+o models, ctrl+s settings
 leantoken "fix the failing test in tests/test_api.py" --repo path/to/repo
 leantoken "add input validation to create_user" --budget 0.50
 leantoken "rename Config to Settings" --private

@@ -14,27 +14,29 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Markdown, OptionList, Static
 
+from . import config
 from .agent import Agent, memory_note
 from .budget import Budget, BudgetExceeded
-from .gateway import bifrost_url, list_models, save_model
+from .gateway import bifrost_url, cached_models, list_models, save_model
 from .tools import Workspace
 
 HELP = """**Commands**
-`/new` clear the session  `/models` pick the large model  `/private` toggle private mode
-`/budget N` set the USD limit  `/sidebar` toggle sidebar  `/help`  `/exit`
+`/new` clear the session  `/models` pick the large and first models  `/private` toggle private mode
+`/budget N` set the USD limit  `/settings` keys and options  `/sidebar` toggle sidebar  `/help`  `/exit`
 
 **Prompt**
 `!cmd` run a shell command yourself  `@path` mention a file (the agent reads only what it needs)
 
 **Keys**
-`ctrl+b` sidebar  `ctrl+n` new session  `ctrl+o` models  `ctrl+q` quit"""
+`ctrl+b` sidebar  `ctrl+n` new session  `ctrl+o` models  `ctrl+s` settings  `ctrl+q` quit"""
 BAR = 20
 GOOD, BAD = "#7fd88f", "#e06c75"
 COMMANDS = {
     "/new": "clear the session",
-    "/models": "pick the large model",
+    "/models": "pick the large and first models",
     "/private": "toggle private mode",
     "/budget": "set the USD limit, e.g. /budget 0.5",
+    "/settings": "edit keys and options",
     "/sidebar": "toggle the sidebar",
     "/help": "show help",
     "/exit": "quit",
@@ -189,23 +191,77 @@ class Permission(Vertical):
             self.draw()
 
 
-class ModelPicker(ModalScreen[str]):
-    BINDINGS = [("escape", "cancel", "cancel")]
+class ModelPicker(ModalScreen[str | None]):
+    """Returns the chosen model, NONE for "no first model", or None when cancelled (keep the current one)."""
 
-    def __init__(self, models: list[str], current: str):
+    BINDINGS = [("escape", "cancel", "cancel")]
+    NONE = "none: use the large model only"
+
+    def __init__(self, models: list[str], current: str, title: str = "Select the large model", allow_none: bool = False):
         super().__init__()
-        self.models, self.current = models, current
+        self.models = ([self.NONE] if allow_none else []) + models
+        self.current, self.title_text = current, title
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Static("Select the large model", id="dtitle")
+            yield Static(self.title_text, id="dtitle")
             yield OptionList(*[("● " if m == self.current else "  ") + m for m in self.models], id="models")
+            yield Static("enter select   esc keep current", id="dhint")
+
+    def on_mount(self) -> None:
+        if self.current in self.models:
+            self.query_one(OptionList).highlighted = self.models.index(self.current)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self.dismiss(self.models[event.option_index])
 
     def action_cancel(self) -> None:
-        self.dismiss("")
+        self.dismiss(None)
+
+
+class Settings(ModalScreen[bool]):
+    """Edit ~/.leantoken/.env in place; saved values apply from the next request."""
+
+    BINDINGS = [("escape", "cancel", "cancel"), Binding("ctrl+s", "save", "save", priority=True)]
+
+    def __init__(self, reason: str = ""):
+        super().__init__()
+        self.reason = reason
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="settings"):
+            yield Static("Settings", id="dtitle")
+            if self.reason:
+                yield Static(self.reason, classes="fail")
+            with VerticalScroll(id="sfields"):
+                for key, desc, example, value in config.fields():
+                    yield Static(Text(key, style="bold") + Text(f"  {desc}", style=MUTED), classes="slabel")
+                    if src := config.overridden(key):
+                        yield Static(f"overridden by {src}", classes="esc")
+                    yield Input(value=value, placeholder=example, password=config.is_secret(key), id=f"f-{key}", classes="sinput")
+            yield Static(Text(f"ctrl+s save   esc cancel   saved to {config.GLOBAL_ENV}", style=MUTED), id="dhint")
+
+    def on_mount(self) -> None:
+        empty = [i for i in self.query(".sinput").results(Input) if not i.value and i.id != "f-BIFROST_URL"]
+        (empty or list(self.query(".sinput").results(Input)))[0].focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        self.focus_next()
+
+    def action_save(self) -> None:
+        for box in self.query(".sinput").results(Input):
+            key, value = box.id.removeprefix("f-"), box.value.strip()
+            config.set_value(key, value or None)
+            if not config.overridden(key):
+                if value:
+                    os.environ[key] = value
+                else:
+                    os.environ.pop(key, None)
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
 
 class TUI(App):
@@ -245,7 +301,12 @@ class TUI(App):
     .esc { color: #f5a742; }
     .diff { border-left: heavy #1e1e1e; padding: 0 1; margin: 0 0 0 2; }
     .note { color: #808080; }
-    ModelPicker { align: center middle; }
+    ModelPicker, Settings { align: center middle; }
+    #settings { width: 90; max-width: 95%; height: 90%; border-left: heavy #5c9cf5; background: #1e1e1e; padding: 1 2; }
+    #sfields { height: 1fr; scrollbar-size-vertical: 1; }
+    .slabel { margin-top: 1; }
+    .sinput { border: none; height: 1; padding: 0 1; background: #0a0a0a; }
+    .sinput:focus { border: none; background: #141414; }
     #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border-left: heavy #5c9cf5; background: #1e1e1e; padding: 1 2; }
     #dialog OptionList { background: #1e1e1e; border: none; padding: 0; }
     #dtitle { text-style: bold; margin-bottom: 1; }
@@ -262,6 +323,7 @@ class TUI(App):
         Binding("ctrl+b", "sidebar", "sidebar", priority=True),
         Binding("ctrl+n", "new", "new", priority=True),
         Binding("ctrl+o", "models", "models", priority=True),
+        Binding("ctrl+s", "settings", "settings"),
         Binding("tab", "complete", "complete", priority=True),
     ]
 
@@ -301,6 +363,21 @@ class TUI(App):
         self.set_interval(15, self.check_gateway)
         self.check_gateway()
         self.call_after_refresh(self.refresh_chrome)
+        if not self.private and not os.environ.get("BIFROST_VK"):
+            self.action_settings("Add your Bifrost virtual key (BIFROST_VK) to get started.")
+        elif not self.model:
+            self.action_models()
+
+    def action_settings(self, reason: str = "") -> None:
+        def saved(ok: bool) -> None:
+            if not ok:
+                return
+            self.say(Static(f"settings saved to {config.GLOBAL_ENV}"), "note")
+            self.check_gateway()
+            if not self.model and os.environ.get("BIFROST_VK"):
+                self.action_models()
+
+        self.push_screen(Settings(reason), saved)
 
     @work(thread=True, exclusive=True, group="health")
     def check_gateway(self) -> None:
@@ -494,6 +571,8 @@ class TUI(App):
         elif cmd == "/budget" and arg.replace(".", "", 1).isdigit():
             self.budget.limit = float(arg)
             self.say(Static(f"budget limit ${self.budget.limit:.2f}"), "note")
+        elif cmd in ("/settings", "/config"):
+            self.action_settings()
         else:
             self.say(Static("Unknown command. Type /help to see what is available."), "note")
         self.refresh_chrome()
@@ -513,23 +592,44 @@ class TUI(App):
         self.turns, self.prior_naive, self.series = [], 0, []
         self.refresh_chrome()
 
-    @work(thread=True, exclusive=True, group="models")
     def action_models(self) -> None:
+        """Pick the large model, then the first model. Opens from the cached list; Bifrost refreshes it behind."""
+        if models := cached_models():
+            self.pick_models(models)
+            self.fetch_models(open_picker=False)
+        else:
+            self.say(Static("loading models from Bifrost..."), "note")
+            self.fetch_models(open_picker=True)
+
+    @work(thread=True, exclusive=True, group="models")
+    def fetch_models(self, open_picker: bool) -> None:
         try:
             models = list_models()
-        except Exception as e:
-            self.call_from_thread(self.say, Static(f"cannot list models: {e}"), "note fail")
+        except (Exception, SystemExit) as e:
+            if open_picker:
+                self.call_from_thread(self.say, Static(f"cannot list models: {e}"), "note fail")
             return
-        if not models:
-            self.call_from_thread(self.say, Static("Bifrost lists no Groq models"), "note fail")
-            return
-        done, box = threading.Event(), []
-        self.call_from_thread(self.push_screen, ModelPicker(models, self.model), lambda m: (box.append(m), done.set()))
-        done.wait()
-        if box[0]:
-            self.model = box[0]
-            save_model(self.model)
-            self.call_from_thread(self.refresh_chrome)
+        if open_picker:
+            if models:
+                self.call_from_thread(self.pick_models, models)
+            else:
+                self.call_from_thread(self.say, Static("Bifrost lists no Groq models"), "note fail")
+
+    def pick_models(self, models: list[str]) -> None:
+        def got_small(small: str | None) -> None:
+            if small is not None:
+                self.small = "" if small == ModelPicker.NONE else small
+                save_model(small=self.small)
+            self.refresh_chrome()
+
+        def got_large(model: str | None) -> None:
+            if model:
+                self.model = model
+                save_model(model=model)
+            self.push_screen(ModelPicker(models, self.small or ModelPicker.NONE, "Step 2 of 2: first model, tried before the large one",
+                                         allow_none=True), got_small)
+
+        self.push_screen(ModelPicker(models, self.model, "Step 1 of 2: large model, used when a task gets hard"), got_large)
 
     @work(thread=True, exclusive=True, group="agent")
     def shell(self, cmd: str) -> None:
