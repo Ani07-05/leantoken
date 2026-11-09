@@ -116,12 +116,16 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
     from leantoken.budget import Budget
 
     class StubAgent:
-        def __init__(self, repo, budget, private, model, small="", approve=None, on_event=None):
+        def __init__(self, repo, budget, private, model, small="", approve=None, on_event=None, **kw):
             self.approve, self.emit = approve, on_event
             self.verified = "tests passing"
             from leantoken.footprint import Footprint
 
             self.fp = Footprint("")
+            self.turn_naive = 0
+
+        def note(self, result):
+            return {"task": "t", "answer": result, "files": []}
 
         def run(self, task):
             self.emit("tool", name="edit_file", args=json.dumps({"path": "a.py", "old": "a", "new": "b"}), out="edited a.py", failed=False)
@@ -302,7 +306,10 @@ def test_long_answer_leaves_the_view_at_the_bottom(tmp_path, monkeypatch):
 
     class StubAgent:
         def __init__(self, *a, **k):
-            self.verified, self.fp = "no tests run", Footprint("")
+            self.verified, self.fp, self.turn_naive = "no tests run", Footprint(""), 0
+
+        def note(self, result):
+            return {"task": "t", "answer": result, "files": []}
 
         def run(self, task):
             return "\n\n".join(f"line {i}" for i in range(80)) + "\n\nTHE END"
@@ -349,3 +356,44 @@ def test_one_huge_output_cannot_inflate_savings(tmp_path):
     capped = agent._saved_prompt_tokens(body, 1000)
     agent.naive["c1"] = 10 * NAIVE_CAP
     assert agent._saved_prompt_tokens(body, 1000) > capped
+
+
+def test_memory_note_is_compact_and_drops_oldest_first():
+    from leantoken.agent import memory_note
+
+    turns = [{"task": f"task {i}", "answer": "a" * 400, "files": ["x.py"] if i == 2 else []} for i in range(10)]
+    note = memory_note(turns, cap=900)
+    assert len(note) <= 900 and "task 9" in note and "task 0" not in note
+    assert memory_note([]) == ""
+
+
+def test_savings_compound_when_a_naive_agent_resends_the_whole_chat(tmp_path):
+    from leantoken.agent import Agent
+    from leantoken.budget import Budget
+
+    def second_turn_saved(prior_naive):
+        agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m", memory="- Q: x\n  A: y", prior_naive=prior_naive)
+        body = {"messages": [{"role": "user", "content": "hi"}], "tools": []}
+        return agent._saved_prompt_tokens(body, 500)
+
+    assert second_turn_saved(0) == 0
+    assert 0 < second_turn_saved(20_000) < second_turn_saved(80_000)
+
+
+def test_later_turns_get_a_memory_of_earlier_ones(tmp_path):
+    from leantoken.agent import Agent
+    from leantoken.budget import Budget
+
+    agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m", memory="- Q: first\n  A: done")
+    sent = []
+
+    class R:
+        status_code, text, headers = 200, "", {}
+
+        def json(self):
+            return {"model": "groq/m", "choices": [{"message": {"content": "ok"}}], "usage": {"prompt_tokens": 50, "completion_tokens": 1}}
+
+    agent._post = lambda body: (sent.append(body), R())[1]
+    agent.run("second")
+    assert "Earlier in this session" in sent[0]["messages"][1]["content"] and "Task: second" in sent[0]["messages"][1]["content"]
+    assert agent.turn_naive > 0 and agent.note("ok")["task"] == "second"

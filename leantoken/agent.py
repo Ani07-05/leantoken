@@ -30,8 +30,20 @@ MAX_TEST_FAILS = 2  # failing test runs after the first edit
 TEST_CMD = re.compile(r"\b(pytest|unittest|tox|nox|jest|vitest|mocha|(npm|pnpm|yarn|cargo|go|dotnet|mvn|gradle) test)\b")
 
 
+def memory_note(turns: list[dict], cap: int = 1800) -> str:
+    """Compact stand-in for earlier turns: question, short answer, files touched. Oldest turns drop first."""
+    lines = []
+    for t in turns:
+        files = f" [files: {', '.join(t['files'])}]" if t["files"] else ""
+        lines.append(f"- Q: {t['task'][:200]}\n  A: {t['answer'][:300]}{files}")
+    while lines and len("\n".join(lines)) > cap:
+        lines.pop(0)
+    return "\n".join(lines)
+
+
 class Agent:
-    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = "", on_event=None):
+    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = "", on_event=None,
+                 memory: str = "", prior_naive: int = 0):
         self.ws = Workspace(repo)
         self.budget = budget
         self.private = private
@@ -53,6 +65,10 @@ class Agent:
             configured = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
             self.fallbacks = configured or list(GROQ_CHAIN)
         self.fp = Footprint("")
+        self.memory = memory  # what this agent sends about earlier turns
+        self.prior_naive = prior_naive  # chars a naive agent would resend: the full transcript of earlier turns
+        self.turn_naive = 0
+        self.files_touched: list[str] = []
         self.naive: dict[str, int] = {}  # tool_call_id -> output size without clipping or ranged reads
         self.verified = "no tests run"
         self.step_limit = 15
@@ -141,9 +157,10 @@ class Agent:
         """
         tools = [m for m in body["messages"] if m["role"] == "tool"]
         sent_chars = len(json.dumps(body["messages"])) + len(json.dumps(body["tools"]))
-        if not tools or not sent_chars:
+        history = max(0, self.prior_naive - len(self.memory))
+        if not sent_chars or (not tools and not history):
             return 0.0
-        extra = sum(max(0, self.naive.get(m["tool_call_id"], len(m["content"])) - len(m["content"])) for m in tools)
+        extra = history + sum(max(0, self.naive.get(m["tool_call_id"], len(m["content"])) - len(m["content"])) for m in tools)
         return extra * prompt_tokens / sent_chars
 
     def _run_tool(self, call: dict) -> tuple[str, bool]:
@@ -166,9 +183,20 @@ class Agent:
             return f"error: {e}", True
         return out, out.startswith("error:")
 
+    def note(self, result: str) -> dict:
+        return {"task": self.fp.task, "answer": result, "files": self.files_touched}
+
     def run(self, task: str, max_steps: int = 15) -> str:
         self.fp.task = task
-        messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task}]
+        prompt = f"Earlier in this session:\n{self.memory}\n\nTask: {task}" if self.memory else task
+        messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        try:
+            return self._loop(messages, max_steps)
+        finally:
+            sizes = [self.naive.get(m["tool_call_id"], len(m["content"])) if m["role"] == "tool" else len(json.dumps(m)) for m in messages[1:]]
+            self.turn_naive = sum(sizes) - (len(prompt) - len(task))
+
+    def _loop(self, messages: list, max_steps: int) -> str:
         tool_errors = test_fails = 0
         last_error = ""
         edited = False
@@ -194,6 +222,9 @@ class Agent:
                 name = call["function"]["name"]
                 if name in ("edit_file", "write_file") and not failed:
                     edited = True
+                    path = json.loads(call["function"]["arguments"] or "{}").get("path")
+                    if path and path not in self.files_touched:
+                        self.files_touched.append(path)
                 if name == "run_shell" and out.startswith("exit=") and TEST_CMD.search(json.dumps(call["function"]["arguments"])):
                     ok = out.startswith("exit=0")
                     self.verified = "tests passing" if ok else "tests failing"

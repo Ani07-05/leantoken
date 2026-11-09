@@ -14,7 +14,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Markdown, OptionList, Static
 
-from .agent import Agent
+from .agent import Agent, memory_note
 from .budget import Budget, BudgetExceeded
 from .gateway import bifrost_url, list_models, save_model
 from .tools import Workspace
@@ -66,6 +66,11 @@ def logo() -> Text:
 def pretty_path(path: Path, width: int = 48) -> str:
     text = str(path).replace(str(Path.home()), "~", 1)
     return text if len(text) <= width else "…" + text[-(width - 1):]
+
+
+def spark(values: list[int], top: int) -> str:
+    bars = "▁▂▃▄▅▆▇█"
+    return "".join(bars[min(7, int(7 * v / top))] if top else bars[0] for v in values)
 
 
 def energy(kwh: float, gco2e: float) -> str:
@@ -273,6 +278,9 @@ class TUI(App):
         self.matches: list[str] = []
         self.always: set[str] = set()
         self.gateway_ok: bool | None = None
+        self.turns: list[dict] = []
+        self.prior_naive = 0
+        self.series: list[tuple[int, int]] = []
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="body", classes="home"):
@@ -414,6 +422,15 @@ class TUI(App):
             t.append("█" * cells + "\n", style=GOOD)
             t.append("est. vs whole-file reads,\nno clipping, no trimming;\nenergy scales with tokens\n", style="#555555")
         t.append("\n")
+        if len(self.series) > 1:
+            shown = self.series[-12:]
+            top = max(n for _, n in shown)
+            head("Per turn")
+            t.append("naive ", style=MUTED)
+            t.append(spark([n for _, n in shown], top) + "\n", style=BAD)
+            t.append("lean  ", style=MUTED)
+            t.append(spark([u for u, _ in shown], top) + "\n", style=GOOD)
+            t.append("gap widens as the chat grows\n\n", style="#555555")
         head("Budget")
         t.append(f"${spent:.4f} of ${limit:.2f}\n")
         t.append("█" * filled, style=bar_color)
@@ -493,6 +510,7 @@ class TUI(App):
         self.session = {"tokens": 0, "saved": 0, "saved_kwh": 0.0, "saved_gco2e": 0.0, "tasks": 0}
         self.files = []
         self.always = set()
+        self.turns, self.prior_naive, self.series = [], 0, []
         self.refresh_chrome()
 
     @work(thread=True, exclusive=True, group="models")
@@ -572,7 +590,8 @@ class TUI(App):
     @work(thread=True, exclusive=True, group="agent")
     def run_task(self, task: str) -> None:
         try:
-            agent = Agent(self.repo, self.budget, self.private, self.model, small=self.small, approve=self.approve, on_event=self.on_agent_event)
+            agent = Agent(self.repo, self.budget, self.private, self.model, small=self.small, approve=self.approve, on_event=self.on_agent_event,
+                          memory=memory_note(self.turns), prior_naive=self.prior_naive)
         except SystemExit as e:
             self.call_from_thread(self.say, Static(str(e)), "note fail")
             self.busy = False
@@ -597,12 +616,19 @@ class TUI(App):
         self.session["saved_kwh"] += t["saved_kwh"]
         self.session["saved_gco2e"] += t["saved_gco2e"]
         self.session["tasks"] += 1
+        self.series.append((t["in"] + t["out"], t["naive_total"]))
+        self.prior_naive += agent.turn_naive
+        if not result.startswith(("error:", "budget exceeded")):
+            self.turns.append(agent.note(result))
         self.task_tokens, self.task_saved = 0, 0.0
         self.say(Markdown(result), "answer")
         if t["saved_prompt"] > 0:
             win = Text("↓ ", style=f"bold {GOOD}") + Text(f"{t['saved_pct']}% fewer tokens", style=f"bold {GOOD}")
             win.append(f"  ~{t['saved_prompt']:,} saved vs a naive agent", style=GOOD)
             win.append(f"  ·  ~{energy(t['saved_kwh'], t['saved_gco2e'])} less (est.)", style=GOOD)
+            if len(self.series) > 1:
+                total = sum(n for _, n in self.series)
+                win.append(f"\n  session so far: ↓ {round(100 * (total - sum(u for u, _ in self.series)) / total)}% across {len(self.series)} turns", style=GOOD)
             self.say(Static(win), "saved")
         parts = [f"{t['in'] + t['out']:,} tokens", f"${t['cost_usd']:.4f}",
                  f"{t['calls']} call{'s' * (t['calls'] != 1)}"]
