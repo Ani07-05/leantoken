@@ -68,6 +68,10 @@ def pretty_path(path: Path, width: int = 48) -> str:
     return text if len(text) <= width else "…" + text[-(width - 1):]
 
 
+def energy(kwh: float, gco2e: float) -> str:
+    return f"{kwh * 1000:.2f} Wh and {gco2e * 1000:.0f} mg CO2"
+
+
 def short(model: str) -> str:
     return model.rsplit("/", 1)[-1]
 
@@ -264,7 +268,7 @@ class TUI(App):
         self.frame = 0
         self.task_tokens = 0
         self.task_saved = 0.0
-        self.session = {"tokens": 0, "saved": 0, "tasks": 0}
+        self.session = {"tokens": 0, "saved": 0, "saved_kwh": 0.0, "saved_gco2e": 0.0, "tasks": 0}
         self.files: list[str] = []
         self.matches: list[str] = []
         self.always: set[str] = set()
@@ -405,9 +409,10 @@ class TUI(App):
             cells = min(BAR, max(1, round(BAR * saved / naive)))
             t.append(f"naive ~{naive:,}\n")
             t.append(f"saved  ↓ {round(100 * saved / naive)}%\n", style=f"bold {GOOD}")
+            t.append(f"~{energy(s['saved_kwh'], s['saved_gco2e'])} less\n", style=GOOD)
             t.append("█" * (BAR - cells), style=ACCENT)
             t.append("█" * cells + "\n", style=GOOD)
-            t.append("est. vs whole-file reads,\nno clipping, no trimming\n", style="#555555")
+            t.append("est. vs whole-file reads,\nno clipping, no trimming;\nenergy scales with tokens\n", style="#555555")
         t.append("\n")
         head("Budget")
         t.append(f"${spent:.4f} of ${limit:.2f}\n")
@@ -485,7 +490,7 @@ class TUI(App):
             return
         self.chat.remove_children()
         self.query_one("#body").add_class("home")
-        self.session = {"tokens": 0, "saved": 0, "tasks": 0}
+        self.session = {"tokens": 0, "saved": 0, "saved_kwh": 0.0, "saved_gco2e": 0.0, "tasks": 0}
         self.files = []
         self.always = set()
         self.refresh_chrome()
@@ -589,12 +594,15 @@ class TUI(App):
         self.busy = False
         self.session["tokens"] += t["in"] + t["out"]
         self.session["saved"] += t["saved_prompt"]
+        self.session["saved_kwh"] += t["saved_kwh"]
+        self.session["saved_gco2e"] += t["saved_gco2e"]
         self.session["tasks"] += 1
         self.task_tokens, self.task_saved = 0, 0.0
         self.say(Markdown(result), "answer")
         if t["saved_prompt"] > 0:
             win = Text("↓ ", style=f"bold {GOOD}") + Text(f"{t['saved_pct']}% fewer tokens", style=f"bold {GOOD}")
             win.append(f"  ~{t['saved_prompt']:,} saved vs a naive agent", style=GOOD)
+            win.append(f"  ·  ~{energy(t['saved_kwh'], t['saved_gco2e'])} less (est.)", style=GOOD)
             self.say(Static(win), "saved")
         parts = [f"{t['in'] + t['out']:,} tokens", f"${t['cost_usd']:.4f}",
                  f"{t['calls']} call{'s' * (t['calls'] != 1)}"]

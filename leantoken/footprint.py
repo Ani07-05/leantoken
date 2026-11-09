@@ -105,7 +105,12 @@ class Footprint:
             m["kwh"] += c.kwh
         used = sum(c.prompt + c.completion for c in self.calls)
         saved = round(self.saved_prompt)
+        gco2e = sum(c.gco2e for c in self.calls)
+        # the energy model ignores input tokens, so the saving is scaled from tokens: energy per token stays constant
+        scale = saved / used if used else 0.0
         return {
+            "saved_kwh": kwh * scale,
+            "saved_gco2e": gco2e * scale,
             "saved_prompt": saved,
             "naive_total": used + saved,
             "saved_pct": round(100 * saved / (used + saved)) if used + saved else 0,
@@ -115,7 +120,7 @@ class Footprint:
             "cost_usd": sum(c.cost for c in self.calls),
             "latency_s": round(sum(c.latency_s for c in self.calls), 2),
             "kwh": kwh,
-            "gco2e": sum(c.gco2e for c in self.calls),
+            "gco2e": gco2e,
             "regions": sorted({c.region for c in self.calls if c.region}),
             "by_model": by_model,
         }

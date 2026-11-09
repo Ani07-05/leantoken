@@ -248,6 +248,7 @@ def test_savings_measure_what_a_naive_agent_would_have_sent(tmp_path):
     assert seen[0] == 0 and seen[1] > 0
     assert t["saved_prompt"] > 0 and 0 < t["saved_pct"] < 100
     assert t["naive_total"] == t["in"] + t["out"] + t["saved_prompt"]
+    assert t["saved_kwh"] == t["kwh"] * t["saved_prompt"] / (t["in"] + t["out"])
 
 
 def _ask_in_tui(tmp_path, text, keys):
