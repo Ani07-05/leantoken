@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -98,6 +99,21 @@ def unwrap(cmd: str | list) -> str | list:
 def shell_cmd(args: dict) -> str:
     cmd = unwrap(args.get("cmd", ""))
     return " ".join(cmd) if isinstance(cmd, list) else str(cmd)
+
+
+SHELL_BUILTINS = {"cd", "export", "source", ".", "set", "unset", "test", "[", "true", "false", "exit", "type", "alias", "ulimit", "umask"}
+
+
+def unrunnable(cmd: str) -> str | None:
+    """An error when the command's program does not exist, so a garbled call never reaches the approval prompt."""
+    try:
+        words = shlex.split(cmd)
+    except ValueError:
+        return None
+    words = [w for w in words if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w)] if words and "=" in words[0] else words
+    if not words or words[0] in SHELL_BUILTINS or "/" in words[0] or shutil.which(words[0]):
+        return None
+    return f"error: command not found: {words[0]}. Send a real command line such as pytest -q or git status."
 
 
 def needs_approval(name: str, args: dict) -> bool:

@@ -9,7 +9,7 @@ import httpx
 from .budget import Budget, BudgetExceeded
 from .footprint import Footprint
 from .gateway import bifrost_url, groq_model, headers
-from .tools import Workspace, describe, needs_approval, schemas
+from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unrunnable
 
 SYSTEM = (
     "You are a terse coding agent. Use search and ranged read_file, never read whole files. "
@@ -154,6 +154,8 @@ class Agent:
             args = json.loads(call["function"]["arguments"] or "{}")
         except json.JSONDecodeError as e:
             return f"error: bad arguments json: {e}", True
+        if name == "run_shell" and (err := unrunnable(shell_cmd(args))):
+            return err, True
         if needs_approval(name, args) and not self.approve(describe(name, args)):
             return "denied by user", False
         try:

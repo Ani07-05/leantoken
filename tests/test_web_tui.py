@@ -290,3 +290,41 @@ def test_permission_reject_and_shell_has_no_always(tmp_path):
     r = _ask_in_tui(tmp_path, "shell: git push", ["n"])
     assert r["choices"] == ["once", "reject"]
     assert r["ok"] is False and r["always"] == set()
+
+
+def test_long_answer_leaves_the_view_at_the_bottom(tmp_path, monkeypatch):
+    import asyncio
+
+    from leantoken import tui
+    from leantoken.budget import Budget
+    from leantoken.footprint import Footprint
+
+    class StubAgent:
+        def __init__(self, *a, **k):
+            self.verified, self.fp = "no tests run", Footprint("")
+
+        def run(self, task):
+            return "\n\n".join(f"line {i}" for i in range(80)) + "\n\nTHE END"
+
+    monkeypatch.setattr(tui, "Agent", StubAgent)
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m", "groq/m")
+
+    async def go():
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press(*"go", "enter")
+            await app.workers.wait_for_complete()
+            await pilot.pause(0.6)
+            chat = app.chat
+            assert chat.max_scroll_y > 0
+            assert chat.scroll_y >= chat.max_scroll_y - 1
+            assert any("tests not run" in str(w.render()) for w in app.query(".note"))
+
+    asyncio.run(go())
+
+
+def test_garbled_shell_commands_are_rejected_before_asking(tmp_path):
+    from leantoken.tools import unrunnable
+
+    assert unrunnable("sh_lev sh_lev sh_lev").startswith("error: command not found: sh_lev")
+    for ok in ("git status", "FOO=1 ls -l", "cd x \&\& ls", "[ -f a ]", "./run.sh", "git log --oneline"):
+        assert unrunnable(ok) is None, ok

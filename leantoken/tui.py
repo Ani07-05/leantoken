@@ -224,7 +224,12 @@ class TUI(App):
     #body.home #main { align: center middle; }
     #body.home #prompt { width: 80; max-width: 100%; margin-top: 0; }
     .user { border-left: heavy #5c9cf5; padding: 1 2; margin-top: 1; background: #1e1e1e; }
-    .answer { margin: 1 0 0 0; padding: 0 2; border-left: heavy #2a2a2a; }
+    .answer { margin: 1 0 0 0; padding: 0 2; border-left: heavy #2a2a2a; height: auto; background: transparent; }
+    .answer MarkdownParagraph, .answer Markdown > * { margin: 0 0 1 0; }
+    MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4 { color: #5c9cf5; text-style: bold; background: transparent; border: none; padding: 0; margin: 1 0 0 0; text-align: left; content-align: left top; }
+    MarkdownFence { background: #141414; margin: 0 0 1 0; padding: 0 1; max-height: 20; }
+    MarkdownBulletList, MarkdownOrderedList { margin: 0 0 1 0; }
+    MarkdownTable { margin: 0 0 1 0; }
     .tool { color: #808080; margin: 0; }
     .saved { margin: 0 0 0 2; }
     .fail { color: #e06c75; }
@@ -330,7 +335,8 @@ class TUI(App):
         if classes:
             widget.add_class(*classes.split())
         self.chat.mount(widget)
-        self.chat.scroll_end(animate=False)
+        self.chat.anchor()  # stays pinned to the newest line until the user scrolls up
+        self.call_after_refresh(self.chat.scroll_end, animate=False)
 
     def route(self) -> Text:
         t = Text()
@@ -339,7 +345,8 @@ class TUI(App):
             t.append(" · ", style=MUTED)
             t.append("local model only", style=MUTED)
             return t
-        t.append(f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}", style=TEXT)
+        routed = self.small and self.small != self.model
+        t.append(f"{short(self.small) + ' > ' if routed else ''}{short(self.model)}", style=TEXT)
         t.append("  Groq", style=MUTED)
         return t
 
@@ -417,9 +424,10 @@ class TUI(App):
         if self.private:
             t.append("local only, nothing leaves\nthis machine\n\n")
         else:
-            t.append(f"{short(self.small) if self.small else short(self.model)}\n", style=TEXT)
-            if self.small and self.small != self.model:
-                t.append(f"-> {short(self.model)}\n", style=TEXT)
+            routed = self.small and self.small != self.model
+            t.append(f"{short(self.small) if routed else short(self.model)}\n", style=TEXT)
+            if routed:
+                t.append(f"then {short(self.model)} if stuck\n", style=MUTED)
             t.append("\n")
         head("Tools")
         t.append("read  search  edit  shell\n")
@@ -435,7 +443,7 @@ class TUI(App):
         if not line:
             return
         if self.busy:
-            self.notify("agent is working, wait for it to finish", severity="warning")
+            self.notify("Still working on the last task", severity="warning")
             return
         if line.startswith("/"):
             self.command(line)
@@ -467,7 +475,7 @@ class TUI(App):
             self.budget.limit = float(arg)
             self.say(Static(f"budget limit ${self.budget.limit:.2f}"), "note")
         else:
-            self.say(Static("unknown command, try /help"), "note")
+            self.say(Static("Unknown command. Type /help to see what is available."), "note")
         self.refresh_chrome()
 
     def action_sidebar(self) -> None:
@@ -553,7 +561,7 @@ class TUI(App):
                 if name == "write_file" and not failed and (path := brief(name, d["args"])) not in self.files:
                     self.files.append(path)
         elif kind == "escalate":
-            self.say(Static(f"↑ escalated to {short(d['to'])}: {d['reason']}"), "esc")
+            self.say(Static(f"↑ switched to {short(d['to'])}: {d['reason']}"), "esc")
         elif kind == "wait":
             self.say(Static(f"  rate limited, waiting {d['seconds']:.0f}s"), "note")
         self.refresh_chrome()
@@ -592,8 +600,12 @@ class TUI(App):
             win = Text("↓ ", style=f"bold {GOOD}") + Text(f"{t['saved_pct']}% fewer tokens", style=f"bold {GOOD}")
             win.append(f"  ~{t['saved_prompt']:,} saved vs a naive agent", style=GOOD)
             self.say(Static(win), "saved")
-        line = (f"{t['in'] + t['out']:,} tok  ${t['cost_usd']:.5f}  {t['kwh'] * 1000:.3f} Wh  {t['gco2e'] * 1000:.1f} mgCO2e"
-                f"  {t['calls']} calls  {len(agent.fp.escalations)} escalations  {agent.verified}")
+        parts = [f"{t['in'] + t['out']:,} tokens", f"${t['cost_usd']:.4f}", f"{t['kwh'] * 1000:.3f} Wh", f"{t['gco2e'] * 1000:.1f} mgCO2e",
+                 f"{t['calls']} call{'s' * (t['calls'] != 1)}"]
+        if agent.fp.escalations:
+            parts.append(f"{len(agent.fp.escalations)} model switch{'es' * (len(agent.fp.escalations) != 1)}")
+        parts.append({"tests passing": "tests pass", "tests failing": "tests fail"}.get(agent.verified, "tests not run"))
+        line = "  ·  ".join(parts)
         self.say(Static(Text(line, style="dim")), "note")
         self.refresh_chrome()
 
