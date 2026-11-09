@@ -158,7 +158,7 @@ class TUI(App):
     #body.home #side { display: none; }
     #body.home #main { align: center middle; }
     #body.home #prompt { width: 80; max-width: 100%; margin-top: 0; }
-    .user { border-left: heavy #5c9cf5; padding: 0 2; margin-top: 1; background: #1e1e1e; }
+    .user { border-left: heavy #5c9cf5; padding: 1 2; margin-top: 1; background: #1e1e1e; }
     .answer { margin: 1 0 0 0; padding: 0; }
     .tool { color: #808080; margin: 0; }
     .fail { color: #e06c75; }
