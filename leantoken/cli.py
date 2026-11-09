@@ -6,6 +6,7 @@ from pathlib import Path
 from .agent import Agent
 from .budget import Budget, BudgetExceeded
 from .gateway import pick_model, resolve_model
+from .tui import TUI
 
 DEFAULT_SMALL = "groq/openai/gpt-oss-20b"
 
@@ -19,6 +20,13 @@ def load_env(path: Path) -> None:
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+
+
+def plain_event(kind: str, **d) -> None:
+    if kind == "wait":
+        print(f"[rate limited, waiting {d['seconds']:.0f}s]")
+    elif kind == "escalate":
+        print(f"[escalated to {d['to']}: {d['reason']}]")
 
 
 def main() -> None:
@@ -40,14 +48,18 @@ def main() -> None:
         pick_model()
         if not a.task:
             return
-    if not a.task:
-        ap.error("task is required")
+    if not a.task and not sys.stdin.isatty():
+        ap.error("task is required when stdin is not a terminal")
 
     repo = Path(a.repo).resolve()
     private = a.private or (repo / ".leantoken-private").exists()
-    model = "" if private else resolve_model(a.model)
-    small = "" if private or a.no_route else (a.small or os.environ.get("LEANTOKEN_SMALL_MODEL") or DEFAULT_SMALL)
-    agent = Agent(repo, Budget(repo / ".leantoken" / "budget.json", a.budget), private, model, small=small)
+    model = resolve_model(a.model)
+    small = "" if a.no_route else (a.small or os.environ.get("LEANTOKEN_SMALL_MODEL") or DEFAULT_SMALL)
+    budget = Budget(repo / ".leantoken" / "budget.json", a.budget)
+    if not a.task:
+        TUI(repo, budget, private, model, small).loop()
+        return
+    agent = Agent(repo, budget, private, "" if private else model, small="" if private else small, on_event=plain_event)
     try:
         result = agent.run(a.task)
     except BudgetExceeded as e:
