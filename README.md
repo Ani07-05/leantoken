@@ -27,7 +27,7 @@ Coding agents read whole files, resend long histories and use the largest model 
 leantoken CLI ──> Bifrost gateway ──> Groq        (default)
                        │          ├──> fallback provider
                        │          ├──> Ollama      (private repos only)
-                       │          └──> Tavily MCP  (docs lookup)
+                       │          └──> Tavily API  (docs lookup, direct from the agent)
                        └─ virtual keys: budget, rate limit, allowed providers
 ```
 
