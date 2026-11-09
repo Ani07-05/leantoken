@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 from rich.text import Text
-from textual import work
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -29,7 +29,13 @@ HELP = """**Commands**
 **Keys**
 `ctrl+b` sidebar  `ctrl+n` new session  `ctrl+o` models  `ctrl+q` quit"""
 BAR = 20
+ACCENT, WARN, TEXT, MUTED, PANEL, BG = "#5c9cf5", "#f5a742", "#eeeeee", "#808080", "#1e1e1e", "#0a0a0a"
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+def pretty_path(path: Path, width: int = 48) -> str:
+    text = str(path).replace(str(Path.home()), "~", 1)
+    return text if len(text) <= width else "…" + text[-(width - 1):]
 
 
 def short(model: str) -> str:
@@ -113,28 +119,33 @@ class ModelPicker(ModalScreen[str]):
 class TUI(App):
     TITLE = "leantoken"
     CSS = """
+    Screen { background: #0a0a0a; color: #eeeeee; }
     #body { height: 1fr; }
     #main { width: 1fr; padding: 0 2; }
-    #chat { height: 1fr; scrollbar-size-vertical: 1; }
-    #side { width: 34; padding: 1 2; border-left: solid $panel; color: $text-muted; }
+    #chat { height: 1fr; scrollbar-size-vertical: 1; scrollbar-background: #0a0a0a; scrollbar-color: #1e1e1e; }
+    #side { width: 34; padding: 1 2; border-left: solid #1e1e1e; color: #808080; }
     #side.hidden { display: none; }
-    #prompt { height: auto; border: round $primary 60%; padding: 0 1; margin-top: 1; }
-    #prompt:focus-within { border: round $primary; }
-    #input { border: none; padding: 0; background: transparent; height: 1; }
-    #mode { color: $text-muted; height: 1; }
-    #foot { height: 1; color: $text-muted; padding: 0 1; }
-    .user { border-left: thick $primary; padding: 0 1; margin-top: 1; background: $boost; }
+    #prompt { height: auto; background: #1e1e1e; border-left: heavy #5c9cf5; padding: 1 2 0 2; margin-top: 1; }
+    #prompt.busy { border-left: heavy #f5a742; }
+    #input { border: none; padding: 0; background: transparent; height: 1; color: #eeeeee; }
+    #input:focus { border: none; background: transparent; background-tint: transparent; }
+    #input > .input--placeholder { color: #808080; text-style: none; }
+    #mode { height: 1; margin-top: 1; }
+    #edge { height: 1; }
+    #foot { height: 1; padding: 0 1; }
+    .user { border-left: heavy #5c9cf5; padding: 0 2; margin-top: 1; background: #1e1e1e; }
     .answer { margin: 1 0 0 0; padding: 0; }
-    .tool { color: $text-muted; margin: 0; }
-    .fail { color: $error; }
-    .esc { color: $warning; }
-    .diff { border-left: thick $panel; padding: 0 1; margin: 0 0 0 2; }
-    .note { color: $text-muted; }
+    .tool { color: #808080; margin: 0; }
+    .fail { color: #e06c75; }
+    .esc { color: #f5a742; }
+    .diff { border-left: heavy #1e1e1e; padding: 0 1; margin: 0 0 0 2; }
+    .note { color: #808080; }
     Approval, ModelPicker { align: center middle; }
-    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border: round $warning; background: $panel; padding: 1 2; }
-    ModelPicker #dialog { border: round $primary; }
+    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border-left: heavy #f5a742; background: #1e1e1e; padding: 1 2; }
+    ModelPicker #dialog { border-left: heavy #5c9cf5; }
+    #dialog OptionList { background: #1e1e1e; border: none; padding: 0; }
     #dtitle { text-style: bold; margin-bottom: 1; }
-    #dhint { margin-top: 1; color: $text-muted; }
+    #dhint { margin-top: 1; color: #808080; }
     """
     BINDINGS = [
         Binding("ctrl+q", "quit", "quit", priority=True),
@@ -159,8 +170,9 @@ class TUI(App):
             with Vertical(id="main"):
                 yield VerticalScroll(id="chat")
                 with Vertical(id="prompt"):
-                    yield Input(placeholder="Ask anything...  (!cmd, @file, /help)", id="input")
+                    yield Input(placeholder="Ask anything...  \"fix the failing test\"", id="input")
                     yield Static(id="mode")
+                yield Static(id="edge")
                 yield Static(id="foot")
             yield Static(id="side")
 
@@ -168,8 +180,8 @@ class TUI(App):
         self.query_one("#input").focus()
         self.set_interval(0.1, self.tick)
         self.say(Static(Text("leantoken", style="bold") + Text("  the coding agent that watches its tokens", style="dim")))
-        self.say(Static(Text(f"{self.repo}  via {bifrost_url()}", style="dim")))
-        self.refresh_chrome()
+        self.say(Static(Text(f"{pretty_path(self.repo)}  via {bifrost_url()}", style="dim")))
+        self.call_after_refresh(self.refresh_chrome)
 
     @property
     def chat(self) -> VerticalScroll:
@@ -181,10 +193,16 @@ class TUI(App):
         self.chat.mount(widget)
         self.chat.scroll_end(animate=False)
 
-    def route(self) -> str:
+    def route(self) -> Text:
+        t = Text()
         if self.private:
-            return "private  local model only"
-        return f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}  groq"
+            t.append("private", style=TEXT)
+            t.append(" · ", style=MUTED)
+            t.append("local model only", style=MUTED)
+            return t
+        t.append(f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}", style=TEXT)
+        t.append("  Groq", style=MUTED)
+        return t
 
     def tick(self) -> None:
         if self.busy:
@@ -192,10 +210,30 @@ class TUI(App):
             self.refresh_chrome()
 
     def refresh_chrome(self) -> None:
-        state = f"{FRAMES[self.frame]} working  {self.task_tokens:,} tok" if self.busy else "Build"
-        self.query_one("#mode", Static).update(Text(state, style="bold") + Text(f"   {self.route()}", style="dim"))
-        self.query_one("#foot", Static).update(Text(f"{self.repo}", style="dim") + Text("    ctrl+b sidebar  ctrl+n new  ctrl+o models  ctrl+q quit", style="dim"))
+        self.query_one("#prompt").set_class(self.busy, "busy")
+        color = WARN if self.busy else ACCENT
+        mode = Text()
+        if self.busy:
+            mode.append(f"{FRAMES[self.frame]} working", style=WARN)
+            mode.append(f"  {self.task_tokens:,} tok", style=MUTED)
+        else:
+            mode.append("Build", style=ACCENT)
+        mode.append(" · ", style=MUTED)
+        mode.append_text(self.route())
+        self.query_one("#mode", Static).update(mode)
+        self.query_one("#edge", Static).update(Text("╹" + "▀" * 400, style=color, no_wrap=True, overflow="crop"))
+        left = Text(pretty_path(self.repo), style=MUTED)
+        hints = Text()
+        for key, label in (("ctrl+b", "sidebar"), ("ctrl+n", "new"), ("ctrl+o", "models"), ("ctrl+q", "quit")):
+            hints.append(key + " ", style=TEXT)
+            hints.append(label + "  " if key != "ctrl+q" else label, style=MUTED)
+        width = self.query_one("#foot").size.width or 100
+        gap = max(2, width - 2 - len(left.plain) - len(hints.plain))
+        self.query_one("#foot", Static).update(left + Text(" " * gap) + hints)
         self.query_one("#side", Static).update(self.sidebar())
+
+    def on_resize(self, event: events.Resize) -> None:
+        self.call_after_refresh(self.refresh_chrome)
 
     def sidebar(self) -> Text:
         s, spent, limit = self.session, self.budget.spent, self.budget.limit
@@ -262,6 +300,7 @@ class TUI(App):
 
     def action_sidebar(self) -> None:
         self.query_one("#side").toggle_class("hidden")
+        self.call_after_refresh(self.refresh_chrome)
 
     def action_new(self) -> None:
         if self.busy:
