@@ -9,7 +9,7 @@ import httpx
 from .budget import Budget, BudgetExceeded
 from .footprint import Footprint
 from .gateway import bifrost_url, groq_model, headers
-from .tools import SCHEMAS, Workspace, describe, needs_approval
+from .tools import Workspace, describe, needs_approval, schemas
 
 SYSTEM = (
     "You are a terse coding agent. Use search and ranged read_file, never read whole files. "
@@ -26,11 +26,14 @@ TEST_CMD = re.compile(r"\b(pytest|unittest|tox|nox|jest|vitest|mocha|(npm|pnpm|y
 
 
 class Agent:
-    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = ""):
+    def __init__(self, repo: Path, budget: Budget, private: bool, model: str = "", approve=None, small: str = "", on_event=None):
         self.ws = Workspace(repo)
         self.budget = budget
         self.private = private
         self.approve = approve or self._ask
+        self.emit = on_event or (lambda kind, **data: None)
+        # Tavily sends the query off the machine, so private runs never get it
+        self.tools = schemas(web=not private and bool(os.environ.get("TAVILY_API_KEY")))
         self.base = bifrost_url()
         self.headers = headers(private)
         if private:
@@ -55,6 +58,7 @@ class Agent:
         if not self.on_small:
             return False
         self.fp.escalations.append({"step": step, "from": self.model, "to": self.large, "reason": reason})
+        self.emit("escalate", to=self.large, reason=reason)
         self.model = self.large
         self.step_limit = max(self.step_limit, step + LARGE_STEPS)
         return True
@@ -76,7 +80,7 @@ class Agent:
 
     def _chat(self, messages: list, step: int = 0, retried: bool = False) -> dict:
         self.budget.check()
-        body = {"model": self.model, "messages": self._trim(messages), "tools": SCHEMAS, "max_tokens": 1024}
+        body = {"model": self.model, "messages": self._trim(messages), "tools": self.tools, "max_tokens": 1024}
         if self.fallbacks:
             body["fallbacks"] = self.fallbacks
         for _ in range(RATE_LIMIT_WAITS + 1):
@@ -86,7 +90,7 @@ class Agent:
             if r.status_code != 429 or "budget_exceeded" in r.text:
                 break
             wait = min(60.0, float(r.headers.get("x-bifrost-retry-after-ms") or 15000) / 1000)
-            print(f"[rate limited, waiting {wait:.0f}s]")
+            self.emit("wait", seconds=wait)
             self.fp.rate_limit_wait_s += wait
             time.sleep(wait)
         if r.status_code >= 400 and "budget_exceeded" in r.text:
@@ -110,6 +114,7 @@ class Agent:
         self.budget.charge(model, pt, ct, local=self.private)
         region = data.get("extra_fields", {}).get("provider_response_headers", {}).get("X-Groq-Region", "")
         self.fp.add(model, pt, ct, latency, local=self.private, region=region)
+        self.emit("call", model=model, prompt=pt, completion=ct)
         self.fp.fallbacks += r.headers.get("x-bifrost-routing-info-is-fallback") == "true"
         msg = data["choices"][0]["message"]
         # extras like "reasoning" would only cost tokens on the next call
@@ -170,6 +175,7 @@ class Agent:
                 tool_errors = tool_errors + 1 if failed else 0
                 last_error = out[:120] if failed else ""
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
+                self.emit("tool", name=name, args=call["function"]["arguments"], out=out, failed=failed)
                 self.fp.trace.append({"step": step, "model": self.model, "tool": name,
                                       "args": call["function"]["arguments"][:120], "out": out[:120]})
             if tool_errors >= MAX_TOOL_ERRORS:

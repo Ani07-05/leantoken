@@ -64,6 +64,11 @@ class Workspace:
         p.write_text(text.replace(old, new))
         return f"edited {path}"
 
+    def web_search(self, query: str, max_results: int = 3) -> str:
+        from .web import search
+
+        return search(query, max_results)
+
     def run_shell(self, cmd: str | list, timeout: int = 120) -> str:
         cmd = unwrap(cmd)
         # models sometimes send argv; run it as argv rather than re-quoting it
@@ -85,7 +90,7 @@ def shell_cmd(args: dict) -> str:
 
 
 def needs_approval(name: str, args: dict) -> bool:
-    if name in ("read_file", "search"):
+    if name in ("read_file", "search", "web_search"):
         return False
     if name == "run_shell":
         return not SAFE_CMD.match(shell_cmd(args))
@@ -121,3 +126,9 @@ SCHEMAS = [
     _fn("write_file", "Create or overwrite a file.", {"path": S, "content": S}, ["path", "content"]),
     _fn("run_shell", f"Run a {SHELL} command string from the repo root (tests, git).", {"cmd": CMD, "timeout": I}, ["cmd"]),
 ]
+
+WEB_SCHEMA = _fn("web_search", "Search the web for current docs or API usage. Use only when the repo cannot answer.", {"query": S, "max_results": I}, ["query"])
+
+
+def schemas(web: bool = False) -> list:
+    return SCHEMAS + [WEB_SCHEMA] if web else SCHEMAS
