@@ -96,7 +96,9 @@ Every task reports how many prompt tokens it saved against a naive agent on the 
 
 ## Benchmark
 
-Same model (`groq/openai/gpt-oss-120b`), same tasks, same Groq free-tier limits, every call through Bifrost. Token counts are the API's own `usage`. The naive arm uses the same loop and tools but reads whole files, keeps tool output unclipped, never trims history and resends the full transcript on every turn. Reproduce with `.venv/bin/python bench/run.py`; raw numbers are in `bench/results.json`.
+Same model (`groq/openai/gpt-oss-120b`), same tasks, same Groq free-tier limits, every call through Bifrost. Token counts are the API's own `usage`. The naive arm uses the same loop and tools but reads whole files, keeps tool output unclipped, never trims history and resends the full transcript on every turn. Reproduce with `.venv/bin/python bench/run.py`; raw numbers are in `bench/results.json`. The chart is generated from those numbers with `.venv/bin/python bench/chart.py`.
+
+![Token efficiency: leantoken vs a naive agent](bench/token-efficiency.svg)
 
 **Coding: fix a seeded bug in a small shop library** (pass = `pytest` is green afterwards)
 
@@ -126,7 +128,7 @@ Limits: one run per arm, one model, one small synthetic project, free-tier rate 
 
 ## Measurement
 
-Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inference/) LLM inference formula: GPU energy from active parameters and output tokens, server energy from request latency, times PUE 1.2. Carbon is energy times the grid intensity of the Groq region that served the call (`X-Groq-Region`; Our World in Data 2023). EcoLogits does not cover Groq and models H100 servers, not Groq LPUs, and it ignores input tokens for GPU energy, so the numbers are comparable estimates, not measurements. Cost uses Groq list prices; Bifrost's logs hold the authoritative cost. Results are reported per completed task. A task only counts if its tests pass, and an escalated step is charged for both models. Benchmark numbers will be added here once the run is done; no savings are claimed before that.
+Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inference/) LLM inference formula: GPU energy from active parameters and output tokens, server energy from request latency, times PUE 1.2. Carbon is energy times the grid intensity of the Groq region that served the call (`X-Groq-Region`; Our World in Data 2023). EcoLogits does not cover Groq and models H100 servers, not Groq LPUs, and it ignores input tokens for GPU energy, so the numbers are comparable estimates, not measurements. Cost uses Groq list prices; Bifrost's logs hold the authoritative cost. Results are reported per completed task. A task only counts if its tests pass, and an escalated step is charged for both models. The Benchmark section above reports one run per arm; the energy and carbon figures there are scaled from token counts, so read them as estimates.
 
 ## Tech
 
