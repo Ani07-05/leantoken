@@ -264,7 +264,7 @@ class TUI(App):
         self.frame = 0
         self.task_tokens = 0
         self.task_saved = 0.0
-        self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.session = {"tokens": 0, "saved": 0, "tasks": 0}
         self.files: list[str] = []
         self.matches: list[str] = []
         self.always: set[str] = set()
@@ -413,8 +413,6 @@ class TUI(App):
         t.append(f"${spent:.4f} of ${limit:.2f}\n")
         t.append("█" * filled, style=bar_color)
         t.append("░" * (BAR - filled) + "\n\n", style="#2a2a2a")
-        head("Footprint")
-        t.append(f"{s['kwh'] * 1000:.3f} Wh\n{s['gco2e'] * 1000:.2f} mgCO2e\n\n")
         head("Gateway")
         up = self.gateway_ok
         t.append("● ", style=MUTED if up is None else GOOD if up else BAD)
@@ -487,7 +485,7 @@ class TUI(App):
             return
         self.chat.remove_children()
         self.query_one("#body").add_class("home")
-        self.session = {"tokens": 0, "saved": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.session = {"tokens": 0, "saved": 0, "tasks": 0}
         self.files = []
         self.always = set()
         self.refresh_chrome()
@@ -591,8 +589,6 @@ class TUI(App):
         self.busy = False
         self.session["tokens"] += t["in"] + t["out"]
         self.session["saved"] += t["saved_prompt"]
-        self.session["kwh"] += t["kwh"]
-        self.session["gco2e"] += t["gco2e"]
         self.session["tasks"] += 1
         self.task_tokens, self.task_saved = 0, 0.0
         self.say(Markdown(result), "answer")
@@ -600,7 +596,7 @@ class TUI(App):
             win = Text("↓ ", style=f"bold {GOOD}") + Text(f"{t['saved_pct']}% fewer tokens", style=f"bold {GOOD}")
             win.append(f"  ~{t['saved_prompt']:,} saved vs a naive agent", style=GOOD)
             self.say(Static(win), "saved")
-        parts = [f"{t['in'] + t['out']:,} tokens", f"${t['cost_usd']:.4f}", f"{t['kwh'] * 1000:.3f} Wh", f"{t['gco2e'] * 1000:.1f} mgCO2e",
+        parts = [f"{t['in'] + t['out']:,} tokens", f"${t['cost_usd']:.4f}",
                  f"{t['calls']} call{'s' * (t['calls'] != 1)}"]
         if agent.fp.escalations:
             parts.append(f"{len(agent.fp.escalations)} model switch{'es' * (len(agent.fp.escalations) != 1)}")
