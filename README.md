@@ -73,7 +73,7 @@ leantoken --pick-model         # choose a Groq model
 ## Usage
 
 ```
-leantoken                      # terminal UI: type a task, /help for commands
+leantoken                      # full-screen TUI (OpenCode-style): /help, !cmd, ctrl+b sidebar, ctrl+o models
 leantoken "fix the failing test in tests/test_api.py" --repo path/to/repo
 leantoken "add input validation to create_user" --budget 0.50
 leantoken "rename Config to Settings" --private
@@ -96,7 +96,7 @@ Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inferenc
 
 ## Tech
 
-Python, httpx, Bifrost, Groq, Ollama, Tavily, EcoLogits, pytest.
+Python, httpx, Textual, Bifrost, Groq, Ollama, Tavily, EcoLogits, pytest.
 
 ## AI usage
 

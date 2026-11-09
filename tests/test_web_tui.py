@@ -97,3 +97,53 @@ def test_argv_with_a_whole_command_line_runs_as_a_shell_string(tmp_path):
     out = Workspace(tmp_path).run_shell(["echo hi there"])
     assert out.startswith("exit=0") and "hi there" in out
     assert Workspace(tmp_path).run_shell(["echo", "a b"]).strip().endswith("a b")
+
+
+def test_edit_diff_marks_removed_and_added_lines():
+    from leantoken.tui import edit_diff
+
+    d = edit_diff(json.dumps({"path": "a", "old": "x = 1\ny = 2", "new": "x = 2"}))
+    assert d.plain == "- x = 1\n- y = 2\n+ x = 2"
+    assert edit_diff("not json") is None
+
+
+def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
+    import asyncio
+
+    from textual.widgets import Markdown
+
+    from leantoken import tui
+    from leantoken.budget import Budget
+
+    class StubAgent:
+        def __init__(self, repo, budget, private, model, small="", approve=None, on_event=None):
+            self.approve, self.emit = approve, on_event
+            self.verified = "tests passing"
+            from leantoken.footprint import Footprint
+
+            self.fp = Footprint("")
+
+        def run(self, task):
+            self.emit("tool", name="edit_file", args=json.dumps({"path": "a.py", "old": "a", "new": "b"}), out="edited a.py", failed=False)
+            assert self.approve("edit a.py\n- a\n+ b") is True
+            return "all done"
+
+    monkeypatch.setattr(tui, "Agent", StubAgent)
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.press(*"fix it", "enter")
+            for _ in range(50):
+                await pilot.pause(0.05)
+                if isinstance(app.screen, tui.Approval):
+                    await pilot.press("y")
+                    break
+            await app.workers.wait_for_complete()
+            await pilot.pause(0.2)
+            texts = [str(m.source) for m in app.query(Markdown)]
+            assert "all done" in texts
+            assert app.files == ["a.py"]
+            assert app.session["tasks"] == 1 and not app.busy
+
+    asyncio.run(go())

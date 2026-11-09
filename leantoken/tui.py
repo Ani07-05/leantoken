@@ -1,27 +1,35 @@
-"""Terminal UI: a REPL where each line is a task for the agent."""
+"""Full-screen terminal UI in the style of OpenCode: conversation, bordered prompt, session sidebar."""
 
 import json
+import os
+import threading
 from pathlib import Path
 
 import httpx
-from prompt_toolkit import PromptSession
-from prompt_toolkit.history import FileHistory
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.table import Table
 from rich.text import Text
+from textual import work
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import Input, Markdown, OptionList, Static
 
 from .agent import Agent
 from .budget import Budget, BudgetExceeded
-from .gateway import CONFIG, bifrost_url, pick_model
+from .gateway import bifrost_url, list_models, save_model
+from .tools import Workspace
 
-HELP = """/help      this list
-/private   toggle private mode (local model only, no web search)
-/model     pick the large Groq model
-/budget N  set the USD limit
-/report    footprint of the last task
-/exit      quit"""
+HELP = """**Commands**
+`/new` clear the session  `/models` pick the large model  `/private` toggle private mode
+`/budget N` set the USD limit  `/sidebar` toggle sidebar  `/help`  `/exit`
+
+**Prompt**
+`!cmd` run a shell command yourself  `@path` mention a file (the agent reads only what it needs)
+
+**Keys**
+`ctrl+b` sidebar  `ctrl+n` new session  `ctrl+o` models  `ctrl+q` quit"""
+BAR = 20
+FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
 def short(model: str) -> str:
@@ -48,127 +56,311 @@ def diff_text(text: str) -> Text:
     return out
 
 
-class TUI:
+def edit_diff(args: str) -> Text | None:
+    try:
+        a = json.loads(args)
+        old, new = a["old"], a["new"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    out = Text()
+    for line in old.splitlines():
+        out.append(f"- {line}\n", style="red")
+    for line in new.splitlines():
+        out.append(f"+ {line}\n", style="green")
+    out.rstrip()
+    return out
+
+
+class Approval(ModalScreen[bool]):
+    BINDINGS = [("y", "allow", "allow"), ("n", "deny", "deny"), ("escape", "deny", "deny")]
+
+    def __init__(self, text: str):
+        super().__init__()
+        self.text = text
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Static("Permission required", id="dtitle")
+            yield Static(diff_text(self.text.rstrip()), id="dbody")
+            yield Static("[b]y[/b] allow   [b]n[/b] deny", id="dhint")
+
+    def action_allow(self) -> None:
+        self.dismiss(True)
+
+    def action_deny(self) -> None:
+        self.dismiss(False)
+
+
+class ModelPicker(ModalScreen[str]):
+    BINDINGS = [("escape", "cancel", "cancel")]
+
+    def __init__(self, models: list[str], current: str):
+        super().__init__()
+        self.models, self.current = models, current
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Static("Select the large model", id="dtitle")
+            yield OptionList(*[("● " if m == self.current else "  ") + m for m in self.models], id="models")
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(self.models[event.option_index])
+
+    def action_cancel(self) -> None:
+        self.dismiss("")
+
+
+class TUI(App):
+    TITLE = "leantoken"
+    CSS = """
+    #body { height: 1fr; }
+    #main { width: 1fr; padding: 0 2; }
+    #chat { height: 1fr; scrollbar-size-vertical: 1; }
+    #side { width: 34; padding: 1 2; border-left: solid $panel; color: $text-muted; }
+    #side.hidden { display: none; }
+    #prompt { height: auto; border: round $primary 60%; padding: 0 1; margin-top: 1; }
+    #prompt:focus-within { border: round $primary; }
+    #input { border: none; padding: 0; background: transparent; height: 1; }
+    #mode { color: $text-muted; height: 1; }
+    #foot { height: 1; color: $text-muted; padding: 0 1; }
+    .user { border-left: thick $primary; padding: 0 1; margin-top: 1; background: $boost; }
+    .answer { margin: 1 0 0 0; padding: 0; }
+    .tool { color: $text-muted; margin: 0; }
+    .fail { color: $error; }
+    .esc { color: $warning; }
+    .diff { border-left: thick $panel; padding: 0 1; margin: 0 0 0 2; }
+    .note { color: $text-muted; }
+    Approval, ModelPicker { align: center middle; }
+    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border: round $warning; background: $panel; padding: 1 2; }
+    ModelPicker #dialog { border: round $primary; }
+    #dtitle { text-style: bold; margin-bottom: 1; }
+    #dhint { margin-top: 1; color: $text-muted; }
+    """
+    BINDINGS = [
+        Binding("ctrl+q", "quit", "quit", priority=True),
+        Binding("ctrl+c", "quit", "quit", priority=True),
+        Binding("ctrl+b", "sidebar", "sidebar", priority=True),
+        Binding("ctrl+n", "new", "new", priority=True),
+        Binding("ctrl+o", "models", "models", priority=True),
+    ]
+
     def __init__(self, repo: Path, budget: Budget, private: bool, model: str, small: str):
+        super().__init__()
         self.repo, self.budget, self.private = repo, budget, private
         self.model, self.small = model, small
-        self.console = Console(highlight=False)
-        self.status = None
-        self.last: Agent | None = None
-        self.last_result = ""
+        self.busy = False
+        self.frame = 0
         self.task_tokens = 0
+        self.session = {"tokens": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.files: list[str] = []
 
-    def toolbar(self) -> str:
-        mode = "private" if self.private else f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}"
-        return f" {mode}  |  ${self.budget.spent:.4f} / ${self.budget.limit:.2f}  |  /help "
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="body"):
+            with Vertical(id="main"):
+                yield VerticalScroll(id="chat")
+                with Vertical(id="prompt"):
+                    yield Input(placeholder="Ask anything...  (!cmd, @file, /help)", id="input")
+                    yield Static(id="mode")
+                yield Static(id="foot")
+            yield Static(id="side")
 
-    def banner(self) -> None:
-        c = self.console
-        c.print(Text("leantoken", style="bold cyan") + Text("  the coding agent that watches its tokens", style="dim"))
-        c.print(Text(f"  {self.repo}", style="dim"))
-        c.print(Text(f"  gateway {bifrost_url()}", style="dim"))
-        c.print()
+    def on_mount(self) -> None:
+        self.query_one("#input").focus()
+        self.set_interval(0.1, self.tick)
+        self.say(Static(Text("leantoken", style="bold") + Text("  the coding agent that watches its tokens", style="dim")))
+        self.say(Static(Text(f"{self.repo}  via {bifrost_url()}", style="dim")))
+        self.refresh_chrome()
 
-    def on_event(self, kind: str, **d) -> None:
-        c = self.console
-        if kind == "call" and self.status:
-            self.task_tokens += d["prompt"] + d["completion"]
-            self.status.update(f"thinking  {short(d['model'])}  {self.task_tokens:,} tok")
-        elif kind == "tool":
-            mark = Text("● ", style="red" if d["failed"] else "green")
-            c.print(mark + Text(d["name"], style="bold") + Text(f"  {brief(d['name'], d['args'])}", style="dim"))
-            first = (d["out"].strip().splitlines() or [""])[0][:100]
-            c.print(Text(f"  ⎿ {first}", style="red" if d["failed"] else "dim"))
-        elif kind == "escalate":
-            c.print(Text(f"↑ escalated to {short(d['to'])}: {d['reason']}", style="yellow"))
-        elif kind == "wait":
-            c.print(Text(f"  rate limited, waiting {d['seconds']:.0f}s", style="dim"))
+    @property
+    def chat(self) -> VerticalScroll:
+        return self.query_one("#chat", VerticalScroll)
+
+    def say(self, widget, classes: str = "") -> None:
+        if classes:
+            widget.add_class(*classes.split())
+        self.chat.mount(widget)
+        self.chat.scroll_end(animate=False)
+
+    def route(self) -> str:
+        if self.private:
+            return "private  local model only"
+        return f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}  groq"
+
+    def tick(self) -> None:
+        if self.busy:
+            self.frame = (self.frame + 1) % len(FRAMES)
+            self.refresh_chrome()
+
+    def refresh_chrome(self) -> None:
+        state = f"{FRAMES[self.frame]} working  {self.task_tokens:,} tok" if self.busy else "Build"
+        self.query_one("#mode", Static).update(Text(state, style="bold") + Text(f"   {self.route()}", style="dim"))
+        self.query_one("#foot", Static).update(Text(f"{self.repo}", style="dim") + Text("    ctrl+b sidebar  ctrl+n new  ctrl+o models  ctrl+q quit", style="dim"))
+        self.query_one("#side", Static).update(self.sidebar())
+
+    def sidebar(self) -> Text:
+        s, spent, limit = self.session, self.budget.spent, self.budget.limit
+        filled = min(BAR, int(BAR * spent / limit)) if limit else 0
+        web = not self.private and bool(os.environ.get("TAVILY_API_KEY"))
+        t = Text()
+        t.append("Session\n", style="bold")
+        t.append(f"{self.repo.name}\n{s['tasks']} task(s)\n\n")
+        t.append("Context\n", style="bold")
+        t.append(f"{s['tokens'] + self.task_tokens:,} tokens\n")
+        t.append(f"${spent:.4f} of ${limit:.2f}\n")
+        t.append("█" * filled, style="cyan")
+        t.append("░" * (BAR - filled) + "\n\n", style="dim")
+        t.append("Footprint\n", style="bold")
+        t.append(f"{s['kwh'] * 1000:.3f} Wh\n{s['gco2e'] * 1000:.2f} mgCO2e\n\n")
+        t.append("Mode\n", style="bold")
+        t.append(f"{'private (local only)' if self.private else 'cloud via Bifrost'}\n")
+        t.append(f"web search {'on' if web else 'off'}\n\n")
+        if self.files:
+            t.append("Modified files\n", style="bold")
+            t.append("\n".join(self.files[-8:]))
+        return t
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        line = event.value.strip()
+        event.input.value = ""
+        if not line:
+            return
+        if self.busy:
+            self.notify("agent is working, wait for it to finish", severity="warning")
+            return
+        if line.startswith("/"):
+            self.command(line)
+        elif line.startswith("!"):
+            self.say(Static(Text(line, style="bold")), "user")
+            self.busy = True
+            self.shell(line[1:].strip())
+        else:
+            self.say(Static(line), "user")
+            self.busy = True
+            self.run_task(line)
+
+    def command(self, line: str) -> None:
+        cmd, _, arg = line.partition(" ")
+        if cmd in ("/exit", "/quit"):
+            self.exit()
+        elif cmd == "/help":
+            self.say(Markdown(HELP), "answer")
+        elif cmd == "/new":
+            self.action_new()
+        elif cmd == "/models":
+            self.action_models()
+        elif cmd == "/sidebar":
+            self.action_sidebar()
+        elif cmd == "/private":
+            self.private = not self.private
+            self.say(Static(f"private mode {'on' if self.private else 'off'}"), "note")
+        elif cmd == "/budget" and arg.replace(".", "", 1).isdigit():
+            self.budget.limit = float(arg)
+            self.say(Static(f"budget limit ${self.budget.limit:.2f}"), "note")
+        else:
+            self.say(Static("unknown command, try /help"), "note")
+        self.refresh_chrome()
+
+    def action_sidebar(self) -> None:
+        self.query_one("#side").toggle_class("hidden")
+
+    def action_new(self) -> None:
+        if self.busy:
+            return
+        self.chat.remove_children()
+        self.session = {"tokens": 0, "kwh": 0.0, "gco2e": 0.0, "tasks": 0}
+        self.files = []
+        self.refresh_chrome()
+
+    @work(thread=True, exclusive=True, group="models")
+    def action_models(self) -> None:
+        try:
+            models = list_models()
+        except Exception as e:
+            self.call_from_thread(self.say, Static(f"cannot list models: {e}"), "note fail")
+            return
+        if not models:
+            self.call_from_thread(self.say, Static("Bifrost lists no Groq models"), "note fail")
+            return
+        done, box = threading.Event(), []
+        self.call_from_thread(self.push_screen, ModelPicker(models, self.model), lambda m: (box.append(m), done.set()))
+        done.wait()
+        if box[0]:
+            self.model = box[0]
+            save_model(self.model)
+            self.call_from_thread(self.refresh_chrome)
+
+    @work(thread=True, exclusive=True, group="agent")
+    def shell(self, cmd: str) -> None:
+        try:
+            out = Workspace(self.repo).run_shell(cmd)
+        except Exception as e:
+            out = f"error: {e}"
+        self.call_from_thread(self.say, Static(Text(out.rstrip(), style="dim")), "diff")
+        self.busy = False
 
     def approve(self, text: str) -> bool:
-        if self.status:
-            self.status.stop()
-        self.console.print(Panel(diff_text(text), title="approval needed", border_style="yellow", expand=False))
-        ok = self.console.input("[bold]allow? (y/N) [/]").strip().lower() == "y"
-        if self.status:
-            self.status.start()
-        return ok
+        done, box = threading.Event(), []
+        self.call_from_thread(self.push_screen, Approval(text), lambda ok: (box.append(ok), done.set()))
+        done.wait()
+        return box[0]
 
-    def footprint(self, agent: Agent) -> None:
-        t = agent.fp.totals()
-        grid = Table.grid(padding=(0, 2))
-        rows = [
-            ("verified", agent.verified),
-            ("calls", f"{t['calls']}  (fallbacks {agent.fp.fallbacks}, escalations {len(agent.fp.escalations)})"),
-            ("tokens", f"{t['in'] + t['out']:,}  (in {t['in']:,} / out {t['out']:,})"),
-            ("cost", f"${t['cost_usd']:.5f}"),
-            ("energy", f"{t['kwh'] * 1000:.4f} Wh"),
-            ("carbon", f"{t['gco2e'] * 1000:.3f} mgCO2e"),
-        ]
-        for k, v in rows:
-            grid.add_row(Text(k, style="dim"), v)
-        self.console.print(Panel(grid, title="footprint", border_style="cyan", expand=False))
+    def on_agent_event(self, kind: str, **d) -> None:
+        self.call_from_thread(self.show_event, kind, d)
 
+    def show_event(self, kind: str, d: dict) -> None:
+        if kind == "call":
+            self.task_tokens += d["prompt"] + d["completion"]
+        elif kind == "tool":
+            name, failed = d["name"], d["failed"]
+            self.say(Static(Text("● ", style="red" if failed else "green") + Text(name, style="bold") + Text(f"  {brief(name, d['args'])}", style="dim")), "tool")
+            if name == "edit_file" and not failed and (diff := edit_diff(d["args"])):
+                self.say(Static(diff), "diff")
+                if (path := brief(name, d["args"])) not in self.files:
+                    self.files.append(path)
+            else:
+                first = (d["out"].strip().splitlines() or [""])[0][:110]
+                self.say(Static(Text(f"  ⎿ {first}")), "tool fail" if failed else "tool")
+                if name == "write_file" and not failed and (path := brief(name, d["args"])) not in self.files:
+                    self.files.append(path)
+        elif kind == "escalate":
+            self.say(Static(f"↑ escalated to {short(d['to'])}: {d['reason']}"), "esc")
+        elif kind == "wait":
+            self.say(Static(f"  rate limited, waiting {d['seconds']:.0f}s"), "note")
+        self.refresh_chrome()
+
+    @work(thread=True, exclusive=True, group="agent")
     def run_task(self, task: str) -> None:
         try:
-            agent = Agent(self.repo, self.budget, self.private, self.model, small=self.small, approve=self.approve, on_event=self.on_event)
+            agent = Agent(self.repo, self.budget, self.private, self.model, small=self.small, approve=self.approve, on_event=self.on_agent_event)
         except SystemExit as e:
-            self.console.print(Text(str(e), style="red"))
+            self.call_from_thread(self.say, Static(str(e)), "note fail")
+            self.busy = False
             return
-        self.last = agent
         self.task_tokens = 0
         try:
-            with self.console.status("thinking", spinner="dots") as st:
-                self.status = st
-                result = agent.run(task)
+            result = agent.run(task)
         except BudgetExceeded as e:
             result = f"budget exceeded: {e}"
         except httpx.ConnectError:
-            result = f"error: cannot reach Bifrost at {bifrost_url()}. Start it with: npx -y @maximhq/bifrost"
+            result = f"cannot reach Bifrost at {bifrost_url()}. Start it with: pnpm dlx @maximhq/bifrost"
         except Exception as e:  # still show what was spent
             result = f"error: {e}"
-        finally:
-            self.status = None
-        self.last_result = result
-        self.console.print()
-        self.console.print(Markdown(result))
-        self.footprint(agent)
         agent.fp.save(self.repo / ".leantoken" / "runs", result, agent.verified)
+        self.call_from_thread(self.finish, agent, result)
 
-    def command(self, line: str) -> bool:
-        cmd, _, arg = line.partition(" ")
-        if cmd in ("/exit", "/quit"):
-            return False
-        if cmd == "/help":
-            self.console.print(HELP)
-        elif cmd == "/private":
-            self.private = not self.private
-            self.console.print(f"private mode {'on' if self.private else 'off'}")
-        elif cmd == "/model":
-            self.model = pick_model()
-        elif cmd == "/budget" and arg.replace(".", "", 1).isdigit():
-            self.budget.limit = float(arg)
-        elif cmd == "/report" and self.last:
-            self.footprint(self.last)
-        else:
-            self.console.print("unknown command, try /help")
-        return True
+    def finish(self, agent: Agent, result: str) -> None:
+        t = agent.fp.totals()
+        self.busy = False
+        self.session["tokens"] += t["in"] + t["out"]
+        self.session["kwh"] += t["kwh"]
+        self.session["gco2e"] += t["gco2e"]
+        self.session["tasks"] += 1
+        self.task_tokens = 0
+        self.say(Markdown(result), "answer")
+        line = (f"{t['in'] + t['out']:,} tok  ${t['cost_usd']:.5f}  {t['kwh'] * 1000:.3f} Wh  {t['gco2e'] * 1000:.1f} mgCO2e"
+                f"  {t['calls']} calls  {len(agent.fp.escalations)} escalations  {agent.verified}")
+        self.say(Static(Text(line, style="dim")), "note")
+        self.refresh_chrome()
 
     def loop(self) -> None:
-        CONFIG.parent.mkdir(parents=True, exist_ok=True)
-        session = PromptSession(history=FileHistory(str(CONFIG.parent / "history")), bottom_toolbar=self.toolbar)
-        self.banner()
-        while True:
-            try:
-                line = session.prompt("❯ ").strip()
-            except (EOFError, KeyboardInterrupt):
-                return
-            if not line:
-                continue
-            if line.startswith("/"):
-                if not self.command(line):
-                    return
-                continue
-            try:
-                self.run_task(line)
-            except KeyboardInterrupt:
-                self.console.print("[dim]interrupted[/]")
+        self.run()
