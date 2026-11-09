@@ -56,6 +56,7 @@ class TUI:
         self.status = None
         self.last: Agent | None = None
         self.last_result = ""
+        self.task_tokens = 0
 
     def toolbar(self) -> str:
         mode = "private" if self.private else f"{short(self.small) + ' > ' if self.small else ''}{short(self.model)}"
@@ -71,7 +72,8 @@ class TUI:
     def on_event(self, kind: str, **d) -> None:
         c = self.console
         if kind == "call" and self.status:
-            self.status.update(f"thinking  {short(d['model'])}  {d['prompt'] + d['completion']:,} tok")
+            self.task_tokens += d["prompt"] + d["completion"]
+            self.status.update(f"thinking  {short(d['model'])}  {self.task_tokens:,} tok")
         elif kind == "tool":
             mark = Text("● ", style="red" if d["failed"] else "green")
             c.print(mark + Text(d["name"], style="bold") + Text(f"  {brief(d['name'], d['args'])}", style="dim"))
@@ -113,6 +115,7 @@ class TUI:
             self.console.print(Text(str(e), style="red"))
             return
         self.last = agent
+        self.task_tokens = 0
         try:
             with self.console.status("thinking", spinner="dots") as st:
                 self.status = st
