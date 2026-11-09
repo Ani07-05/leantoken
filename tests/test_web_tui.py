@@ -91,3 +91,9 @@ def test_tui_helpers():
     assert brief("search", "not json") == "not json"
     styles = [s.style for s in diff_text("edit a\n- old\n+ new").spans]
     assert styles == ["bold", "red", "green"]
+
+
+def test_argv_with_a_whole_command_line_runs_as_a_shell_string(tmp_path):
+    out = Workspace(tmp_path).run_shell(["echo hi there"])
+    assert out.startswith("exit=0") and "hi there" in out
+    assert Workspace(tmp_path).run_shell(["echo", "a b"]).strip().endswith("a b")

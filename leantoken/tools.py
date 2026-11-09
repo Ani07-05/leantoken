@@ -81,6 +81,9 @@ def unwrap(cmd: str | list) -> str | list:
     """["bash", "-lc", "pytest"] -> "pytest": models assume Linux, but on Windows bash is WSL without the repo's tools."""
     if isinstance(cmd, list) and len(cmd) == 3 and Path(cmd[0]).name in ("bash", "sh", "zsh") and cmd[1] in ("-c", "-lc"):
         return cmd[2]
+    # a whole command line inside one argv element, e.g. ["pytest -q"], is not an executable name
+    if isinstance(cmd, list) and cmd and " " in cmd[0]:
+        return " ".join(cmd)
     return cmd
 
 
