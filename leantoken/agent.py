@@ -14,7 +14,7 @@ from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unru
 SYSTEM_NAIVE = "You are a coding assistant. Use the tools to complete the task and reply when done."
 SYSTEM = (
     "You are a terse coding agent. Use list_files, search and ranged read_file, never read whole files. "
-    "Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
+    "Never grep, find or cat in the shell; search is ripgrep. Prefer edit_file over write_file. Run tests to verify. Stop when done and reply in one line."
 )
 # a question gets no write tools, so asking about the code can never change it
 SYSTEM_ASK = (
@@ -195,6 +195,7 @@ class Agent:
             args = json.loads(call["function"]["arguments"] or "{}")
         except json.JSONDecodeError as e:
             return f"error: bad arguments json: {e}", True
+        self.emit("start", name=name, args=call["function"]["arguments"])
         if self.lean and name == "run_shell" and (err := unrunnable(shell_cmd(args))):
             return err, True
         if needs_approval(name, args) and not self.approve(describe(name, args)):

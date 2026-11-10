@@ -84,7 +84,7 @@ def test_events_reach_the_ui(tmp_path, monkeypatch):
     agent._post = lambda body: R()
     monkeypatch.setattr(Workspace, "search", lambda self, pattern="": "hit")
     assert agent.run("t") == "ok"
-    assert events == ["call", "tool", "call"]
+    assert events == ["call", "start", "tool", "call"]
 
 
 def test_tui_helpers():
@@ -327,7 +327,7 @@ def test_long_answer_leaves_the_view_at_the_bottom(tmp_path, monkeypatch):
             chat = app.chat
             assert chat.max_scroll_y > 0
             assert chat.scroll_y >= chat.max_scroll_y - 1
-            assert any("tests not run" in str(w.render()) for w in app.query(".note"))
+            assert any(" tokens" in str(w.render()) for w in app.query(".note"))
 
     asyncio.run(go())
 
