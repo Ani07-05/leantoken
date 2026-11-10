@@ -125,7 +125,9 @@ touch <repo>/.leantoken-private        # always private in this repo
 
 - Model: `qwen2.5-coder:7b` by default; change it with `LEANTOKEN_LOCAL_MODEL`.
 - Inside the TUI, `/private` toggles it (it refuses to switch on without `BIFROST_PRIVATE_VK`), and the footer and sidebar show the local model.
-- Private runs never ask for a Groq key or list Groq models, cost cost $0 and report no cloud carbon..
+- Private runs never ask for a Groq key or list Groq models, and cost $0.
+- Shell: the agent cannot run common network tools (`curl`, `wget`, `ssh`, `git push`/`fetch`/`clone`, `pip`/`npm install` and similar). This is a best-effort block, not a sandbox: a script can still open a socket, so use an OS-level sandbox if you need a hard guarantee. The model call itself is local by construction.
+- Footprint: energy and carbon show as n/a, because the EcoLogits estimate models cloud GPUs and says nothing about your machine. Token savings are still reported.
 
 ## Benchmark
 
