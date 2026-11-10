@@ -72,6 +72,7 @@ class Call:
     kwh: float
     region: str = ""
     gco2e: float = 0.0
+    local: bool = False
 
 
 @dataclass
@@ -87,9 +88,10 @@ class Footprint:
 
     def add(self, model: str, prompt: int, completion: int, latency_s: float, local: bool = False, region: str = "") -> Call:
         pin, pout = (0.0, 0.0) if local else price(model)
-        kwh = energy_kwh(model, completion, latency_s)
+        # the EcoLogits formula models cloud GPUs, so it says nothing about a local Ollama run
+        kwh = 0.0 if local else energy_kwh(model, completion, latency_s)
         c = Call(model, prompt, completion, round(latency_s, 3), (prompt * pin + completion * pout) / 1e6,
-                 kwh, region, kwh * grid(region))
+                 kwh, region, kwh * grid(region), local)
         self.calls.append(c)
         return c
 
@@ -137,14 +139,19 @@ class Footprint:
             f"saved      ~{t['saved_prompt']:,} tokens ({t['saved_pct']}% fewer than a naive agent; estimate, see README)",
             f"cost       ${t['cost_usd']:.5f}  (price table; Bifrost logs are authoritative)",
             f"latency    {t['latency_s']}s model time" + (f", {self.rate_limit_wait_s:.0f}s rate-limit wait" if self.rate_limit_wait_s else ""),
-            f"energy     {t['kwh'] * 1000:.4f} Wh  (EcoLogits estimate, PUE {PUE})",
-            f"carbon     {t['gco2e'] * 1000:.3f} mgCO2e  (Groq region {','.join(t['regions']) or '?'}, grid {self._grid_label(t)})",
+            *self._footprint_lines(t),
         ]
         for m, v in t["by_model"].items():
             lines.append(f"  {m:<28} {v['calls']} calls  {v['in'] + v['out']:>7,} tok  ${v['cost']:.5f}  {v['kwh'] * 1000:.4f} Wh")
         for e in self.escalations:
             lines.append(f"  escalated at step {e['step']}: {e['reason']}")
         return "\n".join(lines)
+
+    def _footprint_lines(self, t: dict) -> list[str]:
+        if self.calls and all(c.local for c in self.calls):
+            return ["energy     n/a  (local model, not estimated)", "carbon     n/a  (local model, not estimated)"]
+        return [f"energy     {t['kwh'] * 1000:.4f} Wh  (EcoLogits estimate, PUE {PUE})",
+                f"carbon     {t['gco2e'] * 1000:.3f} mgCO2e  (Groq region {','.join(t['regions']) or '?'}, grid {self._grid_label(t)})"]
 
     def _grid_label(self, t: dict) -> str:
         return ", ".join(f"{grid(r):.0f}" for r in (t["regions"] or [""])) + " g/kWh"

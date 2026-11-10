@@ -252,3 +252,28 @@ def test_tui_private_toggle_needs_the_private_key(tmp_path, monkeypatch):
             assert "qwen2.5-coder" in str(app.route().plain)
 
     asyncio.run(go())
+
+
+def test_network_commands_are_blocked_in_private_runs():
+    from leantoken.tools import network_command
+
+    for cmd in ("curl https://x.io", "cd app && wget x", "git push origin main", "FOO=1 pip install requests", "/usr/bin/ssh host", "npx foo"):
+        assert network_command(cmd), cmd
+    for cmd in ("pytest -q", "git status", "git diff --stat", "ls -la", "python -m pytest tests"):
+        assert network_command(cmd) is None, cmd
+
+
+def test_private_agent_refuses_a_network_shell_command(tmp_path, monkeypatch):
+    agent, _ = _agent(tmp_path, monkeypatch, private=True)
+    call = {"function": {"name": "run_shell", "arguments": json.dumps({"cmd": "curl https://example.com"})}, "id": "1"}
+    out, failed = agent._run_tool(call)
+    assert failed and "private mode" in out
+
+
+def test_local_run_reports_no_energy_estimate():
+    from leantoken.footprint import Footprint
+
+    fp = Footprint("t")
+    fp.add("ollama/qwen2.5-coder:7b", 100, 50, 2.0, local=True)
+    assert fp.totals()["kwh"] == 0 and fp.totals()["gco2e"] == 0
+    assert "n/a" in fp.report("ok", "")

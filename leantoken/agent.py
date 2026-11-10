@@ -9,7 +9,7 @@ import httpx
 from .budget import Budget, BudgetExceeded
 from .footprint import Footprint
 from .gateway import bifrost_url, groq_model, headers, local_model
-from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unrunnable
+from .tools import Workspace, describe, needs_approval, network_command, schemas, shell_cmd, unrunnable
 
 SYSTEM_NAIVE = "You are a coding assistant. Use the tools to complete the task and reply when done."
 SYSTEM = (
@@ -196,6 +196,8 @@ class Agent:
         except json.JSONDecodeError as e:
             return f"error: bad arguments json: {e}", True
         self.emit("start", name=name, args=call["function"]["arguments"])
+        if self.private and name == "run_shell" and (err := network_command(shell_cmd(args))):
+            return err, True
         if self.lean and name == "run_shell" and (err := unrunnable(shell_cmd(args))):
             return err, True
         if needs_approval(name, args) and not self.approve(describe(name, args)):

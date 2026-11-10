@@ -551,10 +551,11 @@ class TUI(App):
             cells = min(BAR, max(1, round(BAR * saved / naive)))
             t.append(f"naive ~{naive:,}\n")
             t.append(f"saved  ↓ {round(100 * saved / naive)}%\n", style=f"bold {GOOD}")
-            t.append(f"~{energy(s['saved_kwh'], s['saved_gco2e'])} less\n", style=GOOD)
+            if not self.private:
+                t.append(f"~{energy(s['saved_kwh'], s['saved_gco2e'])} less\n", style=GOOD)
             t.append("█" * (BAR - cells), style=ACCENT)
             t.append("█" * cells + "\n", style=GOOD)
-            t.append("est. vs whole-file reads,\nno clipping, no trimming;\nenergy scales with tokens\n", style="#555555")
+            t.append("est. vs whole-file reads,\nno clipping, no trimming" + ("" if self.private else ";\nenergy scales with tokens") + "\n", style="#555555")
         t.append("\n")
         if len(self.series) > 1:
             shown = self.series[-12:]

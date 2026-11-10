@@ -173,6 +173,33 @@ def unrunnable(cmd: str) -> str | None:
     return f"error: command not found: {words[0]}. Send a real command line such as pytest -q or git status."
 
 
+# a private run promises nothing leaves the machine; this is a best-effort block on common network tools, not a sandbox
+NETWORK_PROGRAMS = {"curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "telnet", "ftp", "dig", "nslookup", "ping"}
+NETWORK_SUBCOMMANDS = {
+    "git": {"push", "pull", "fetch", "clone"},
+    "pip": {"install", "download"}, "pip3": {"install", "download"}, "uv": {"add", "sync", "pip"},
+    "npm": {"install", "i", "ci", "publish", "exec"}, "pnpm": {"install", "i", "add", "dlx"}, "yarn": {"install", "add"}, "npx": None,
+    "go": {"get", "install", "mod"}, "cargo": {"install", "add", "fetch"}, "brew": {"install", "upgrade", "update"},
+}
+
+
+def network_command(cmd: str) -> str | None:
+    """An error when a command would use the network, for private runs."""
+    for part in re.split(r"[;&|\n]+", cmd):
+        try:
+            words = shlex.split(part)
+        except ValueError:
+            continue
+        words = [w for w in words if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w)]
+        if not words:
+            continue
+        prog = Path(words[0]).name
+        subs = NETWORK_SUBCOMMANDS.get(prog, set())
+        if prog in NETWORK_PROGRAMS or subs is None or (subs and any(w in subs for w in words[1:3])):
+            return f"error: private mode blocks network commands ({prog}). Work offline with the files already in the repo."
+    return None
+
+
 def needs_approval(name: str, args: dict) -> bool:
     if name in ("read_file", "search", "list_files", "web_search"):
         return False
