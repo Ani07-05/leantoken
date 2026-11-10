@@ -1,10 +1,45 @@
+<div align="center">
+
 # leantoken
 
-A coding agent that finishes real dev tasks on the fewest tokens, and reports what each task cost in money, energy and carbon.
+**A coding agent that finishes real dev tasks on the fewest tokens, and reports what each task cost in money, energy and carbon.**
+
+![54% fewer tokens](https://img.shields.io/badge/tokens-54%25_fewer_than_naive-10b981?style=for-the-badge)
+![pass rate](https://img.shields.io/badge/pass_rate-4%2F4-5c9cf5?style=for-the-badge)
+![python](https://img.shields.io/badge/python-3.10+-f5a742?style=for-the-badge)
+![gateway](https://img.shields.io/badge/gateway-Bifrost-808080?style=for-the-badge)
+
+<img src="docs/home.svg" alt="leantoken opening in the terminal" width="860">
+
+<sub>Run <code>leantoken</code> in any folder. It opens a full-screen TUI.</sub>
+
+</div>
 
 Built for the Geek Room Global AI Hackathon, theme: *Build a Coding Agent That Gets the Job Done on the Fewest Tokens*. Every model call goes through the [Bifrost](https://github.com/maximhq/bifrost) gateway.
 
 **Result: 54% fewer tokens than a naive agent across four coding tasks, at the same 4/4 pass rate.** See [Benchmark](#benchmark).
+
+## See it work
+
+<div align="center">
+<img src="docs/working.svg" alt="leantoken working on a task, with the live savings sidebar" width="860">
+</div>
+
+While a task runs, a pixel animal tells you what the agent is doing, and the sidebar tracks tokens used against a naive twin of every request, cost, energy and carbon.
+
+<div align="center">
+<img src="docs/animals.png" alt="Six pixel animals: bunny thinking, frog typing, cat searching, owl reading, penguin in the shell, octopus on the web" width="720">
+</div>
+
+<div align="center"><sub>thinking &middot; editing &middot; searching &middot; reading &middot; shell &middot; web</sub></div>
+
+**Quick start**
+
+```
+pip install -e '.[dev]'
+npx -y @maximhq/bifrost     # gateway on http://localhost:8080
+leantoken                   # first run opens Settings: paste your virtual key, ctrl+s
+```
 
 ## What it does
 
@@ -18,12 +53,13 @@ Built for the Geek Room Global AI Hackathon, theme: *Build a Coding Agent That G
 
 ## Architecture
 
-```
-leantoken CLI ──> Bifrost gateway ──> Groq        (default)
-                       │          ├──> fallback provider
-                       │          ├──> Ollama      (private repos only)
-                       │          └──> Tavily API  (docs lookup, direct from the agent)
-                       └─ virtual keys: budget, rate limit, allowed providers
+```mermaid
+flowchart LR
+    CLI["leantoken"] --> BF["Bifrost gateway<br/>virtual keys: budget, rate limit, providers"]
+    BF --> G["Groq (default)"]
+    BF --> F["fallback provider"]
+    BF --> O["Ollama (private repos only)"]
+    CLI -. "docs lookup" .-> T["Tavily API"]
 ```
 
 1. Each step goes to the small model through Bifrost with the user's virtual key.
