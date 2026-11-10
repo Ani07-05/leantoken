@@ -55,7 +55,8 @@ class Workspace:
     def search(self, pattern: str, path: str = ".") -> str:
         target = str(self._path(path))
         if shutil.which("rg"):
-            cmd = ["rg", "-n", "--no-heading", "-m", "5", pattern, target]
+            cmd = ["rg", "-n", "--no-heading", "--no-messages", "--sort", "path", "-m", "5", "--max-columns", "200", "--max-columns-preview",
+                   "-g", "!.leantoken", pattern, target]
         elif shutil.which("grep") and os.name != "nt":
             cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
         else:
@@ -165,7 +166,9 @@ def unrunnable(cmd: str) -> str | None:
     words = [w for w in words if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w)] if words and "=" in words[0] else words
     if words and words[0] == "ls" and any(w == "--recursive" or (w.startswith("-") and not w.startswith("--") and "R" in w) for w in words[1:]):
         return "error: ls -R prints the whole tree. Use list_files, or search to find one."
-    if not words or words[0] in SHELL_BUILTINS or "/" in words[0] or shutil.which(words[0]):
+    if not words or not words[0]:
+        return "error: empty command. Send a real command line such as pytest -q or git status."
+    if words[0] in SHELL_BUILTINS or "/" in words[0] or shutil.which(words[0]):
         return None
     return f"error: command not found: {words[0]}. Send a real command line such as pytest -q or git status."
 
