@@ -206,3 +206,49 @@ def test_bash_wrapper_unwrapped():
     assert unwrap(["bash", "-lc", "pytest -q"]) == "pytest -q"
     assert unwrap(["python", "-m", "pytest"]) == ["python", "-m", "pytest"]
     assert not needs_approval("run_shell", {"cmd": ["bash", "-lc", "git status"]})
+
+
+def test_private_cli_never_resolves_cloud_models(tmp_path, monkeypatch):
+    from leantoken import cli
+
+    def boom(*a, **k):
+        raise AssertionError("private run touched the Groq model list")
+
+    seen = {}
+
+    class StubAgent:
+        def __init__(self, repo, budget, private, model, small="", **k):
+            seen.update(private=private, model=model, small=small)
+            self.fp, self.verified, self.budget = type("F", (), {"report": lambda *a: "", "save": lambda *a: ""})(), "", budget
+
+        def run(self, task):
+            return "ok"
+
+    monkeypatch.setattr(cli, "resolve_model", boom)
+    monkeypatch.setattr(cli, "resolve_small", boom)
+    monkeypatch.setattr(cli, "Agent", StubAgent)
+    monkeypatch.setattr("sys.argv", ["leantoken", "task", "--private", "--repo", str(tmp_path)])
+    cli.main()
+    assert seen == {"private": True, "model": "", "small": ""}
+
+
+def test_tui_private_toggle_needs_the_private_key(tmp_path, monkeypatch):
+    import asyncio
+
+    from leantoken import tui
+
+    monkeypatch.setenv("BIFROST_VK", "sk-bf-x")
+    monkeypatch.delenv("BIFROST_PRIVATE_VK", raising=False)
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+
+    async def go():
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause(0.1)
+            app.command("/private")
+            assert not app.private
+            monkeypatch.setenv("BIFROST_PRIVATE_VK", "sk-bf-p")
+            app.command("/private")
+            assert app.private
+            assert "qwen2.5-coder" in str(app.route().plain)
+
+    asyncio.run(go())

@@ -47,13 +47,16 @@ def main() -> None:
     repo = Path(a.repo).resolve()
     private = a.private or (repo / ".leantoken-private").exists()
     # the TUI opens settings and the model picker itself, so don't block on them here
-    model = resolve_model(a.model) if a.task else (a.model or os.environ.get("LEANTOKEN_MODEL") or saved_model() or "")
-    small = "" if a.no_route else resolve_small(a.small)
+    if private:
+        model = small = ""
+    else:
+        model = resolve_model(a.model) if a.task else (a.model or os.environ.get("LEANTOKEN_MODEL") or saved_model() or "")
+        small = "" if a.no_route else resolve_small(a.small)
     budget = Budget(repo / ".leantoken" / "budget.json", a.budget)
     if not a.task:
         TUI(repo, budget, private, model, small).loop()
         return
-    agent = Agent(repo, budget, private, "" if private else model, small="" if private else small, on_event=plain_event)
+    agent = Agent(repo, budget, private, model, small=small, on_event=plain_event)
     try:
         result = agent.run(a.task)
     except BudgetExceeded as e:

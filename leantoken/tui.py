@@ -23,7 +23,7 @@ from textual_image.widget import Image
 
 from . import art
 from .art import TOOL_SCENE, color, verb
-from .gateway import bifrost_url, cached_models, list_models, save_model
+from .gateway import bifrost_url, cached_models, list_models, local_model, save_model
 from .tools import Workspace
 
 BAR = 20
@@ -384,9 +384,11 @@ class TUI(App):
         self.set_interval(15, self.check_gateway)
         self.check_gateway()
         self.call_after_refresh(self.refresh_chrome)
-        if not self.private and not os.environ.get("BIFROST_VK"):
+        if self.private and not os.environ.get("BIFROST_PRIVATE_VK"):
+            self.action_settings("Private mode needs the Ollama-only virtual key (BIFROST_PRIVATE_VK).")
+        elif not self.private and not os.environ.get("BIFROST_VK"):
             self.action_settings("Add your Bifrost virtual key (BIFROST_VK) to get started.")
-        elif not self.model:
+        elif not self.model and not self.private:
             self.action_models()
 
     def action_settings(self, reason: str = "") -> None:
@@ -395,7 +397,7 @@ class TUI(App):
                 return
             self.say(Static(f"settings saved to {config.GLOBAL_ENV}"), "note")
             self.check_gateway()
-            if not self.model and os.environ.get("BIFROST_VK"):
+            if not self.model and not self.private and os.environ.get("BIFROST_VK"):
                 self.action_models()
 
         self.push_screen(Settings(reason), saved)
@@ -453,7 +455,7 @@ class TUI(App):
         if self.private:
             t.append("private", style=TEXT)
             t.append(" · ", style=MUTED)
-            t.append("local model only", style=MUTED)
+            t.append(short(local_model()), style=MUTED)
             return t
         routed = self.small and self.small != self.model
         t.append(f"{short(self.small) + ' > ' if routed else ''}{short(self.model)}", style=TEXT)
@@ -588,7 +590,8 @@ class TUI(App):
         t.append(f"{bifrost_url().split('//')[-1]}\n\n")
         head("Models")
         if self.private:
-            t.append("local only, nothing leaves\nthis machine\n\n")
+            t.append(f"{short(local_model())}\n", style=TEXT)
+            t.append("local only, nothing leaves\nthis machine\n\n", style=MUTED)
         else:
             routed = self.small and self.small != self.model
             t.append(f"{short(self.small) if routed else short(self.model)}\n", style=TEXT)
@@ -635,8 +638,11 @@ class TUI(App):
         elif cmd == "/sidebar":
             self.action_sidebar()
         elif cmd == "/private":
-            self.private = not self.private
-            self.say(Static(f"private mode {'on' if self.private else 'off'}"), "note")
+            if not self.private and not os.environ.get("BIFROST_PRIVATE_VK"):
+                self.say(Static("private mode needs BIFROST_PRIVATE_VK. Set it in /settings."), "note fail")
+            else:
+                self.private = not self.private
+                self.say(Static(f"private mode on: {local_model()}, nothing leaves this machine" if self.private else "private mode off"), "note")
         elif cmd == "/budget" and arg.replace(".", "", 1).isdigit():
             self.budget.limit = float(arg)
             self.say(Static(f"budget limit ${self.budget.limit:.2f}"), "note")
@@ -670,6 +676,9 @@ class TUI(App):
 
     def action_models(self) -> None:
         """Pick the large model, then the first model. Opens from the cached list; Bifrost refreshes it behind."""
+        if self.private:
+            self.say(Static(f"private mode runs {local_model()}. Change it with LEANTOKEN_LOCAL_MODEL."), "note")
+            return
         if models := cached_models():
             self.pick_models(models)
             self.fetch_models(open_picker=False)

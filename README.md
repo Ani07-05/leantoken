@@ -112,6 +112,21 @@ The small model (`groq/openai/gpt-oss-20b` by default) runs first. leantoken swi
 
 Each run prints a footprint report and saves it, with a per-step trace, to `<repo>/.leantoken/runs/`. The TUI also plots tokens saved per turn against a naive twin of each request (whole-file reads, unclipped output, full history); that figure is an estimate for one run, while the benchmark below is the measured comparison.
 
+## Private mode
+
+For repos that must not leave your machine. Private mode runs one local Ollama model through Bifrost, with no Groq, no cloud fallback and no `web_search`. The private virtual key allows only Ollama, so Bifrost refuses any cloud call even if leantoken asked for one.
+
+```
+ollama pull qwen2.5-coder:7b
+leantoken config set BIFROST_PRIVATE_VK <ollama-only key>
+leantoken --private                    # TUI, or add a task for a one-shot run
+touch <repo>/.leantoken-private        # always private in this repo
+```
+
+- Model: `qwen2.5-coder:7b` by default; change it with `LEANTOKEN_LOCAL_MODEL`.
+- Inside the TUI, `/private` toggles it (it refuses to switch on without `BIFROST_PRIVATE_VK`), and the footer and sidebar show the local model.
+- Private runs never ask for a Groq key or list Groq models, cost cost $0 and report no cloud carbon..
+
 ## Benchmark
 
 Same model (`groq/openai/gpt-oss-120b`), same tasks, same Groq free-tier limits, every call through Bifrost. Token counts are the API's own `usage`. The naive arm uses the same loop and tools but reads whole files, keeps tool output unclipped, never trims history and resends the full transcript on every turn. Reproduce with `.venv/bin/python bench/run.py`; raw numbers are in `bench/results.json`. The chart is generated from those numbers with `.venv/bin/python bench/chart.py`.

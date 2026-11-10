@@ -8,7 +8,7 @@ import httpx
 
 from .budget import Budget, BudgetExceeded
 from .footprint import Footprint
-from .gateway import bifrost_url, groq_model, headers
+from .gateway import bifrost_url, groq_model, headers, local_model
 from .tools import Workspace, describe, needs_approval, schemas, shell_cmd, unrunnable
 
 SYSTEM_NAIVE = "You are a coding assistant. Use the tools to complete the task and reply when done."
@@ -76,7 +76,7 @@ class Agent:
         if private:
             # private repos never leave the machine: local model, no cloud fallback;
             # the private virtual key also blocks any other provider at the gateway
-            self.model = "ollama/" + os.environ.get("LEANTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
+            self.model = local_model()
             self.fallbacks = []
             self.large = self.model
         else:

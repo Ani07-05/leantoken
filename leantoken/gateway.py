@@ -25,6 +25,10 @@ def headers(private: bool = False) -> dict:
     return {"x-bf-vk": vk} if vk else {}
 
 
+def local_model() -> str:
+    return "ollama/" + os.environ.get("LEANTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
+
+
 def groq_model(model: str) -> str:
     return model if model.startswith("groq/") else f"groq/{model}"
 
