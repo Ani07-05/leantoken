@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -816,4 +817,16 @@ class TUI(App):
         self.refresh_chrome()
 
     def loop(self) -> None:
-        self.run()
+        # The terminal's own padding, scrollbar gutter and the pixels left over past the last cell are
+        # outside the grid Textual can paint. OSC 11 sets the terminal's default background to match the
+        # app so that margin blends in; OSC 111 restores the user's colour on exit.
+        tty = sys.__stdout__ if sys.__stdout__ and sys.__stdout__.isatty() else None
+        if tty:
+            tty.write("\x1b]11;#0a0a0a\x1b\\")
+            tty.flush()
+        try:
+            self.run()
+        finally:
+            if tty:
+                tty.write("\x1b]111\x1b\\")
+                tty.flush()
