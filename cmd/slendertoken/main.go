@@ -197,7 +197,7 @@ func oneShot(repo string, b *budget.Budget, private bool, model, small, task str
 	if err != nil {
 		return err
 	}
-	result, err := ag.Run(task, 15)
+	result, err := ag.Run(task, 0)
 	if err != nil {
 		result = "error: " + err.Error()
 	}

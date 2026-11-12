@@ -40,6 +40,7 @@ const (
 	rateLimitWaits = 4
 	// right-size routing: the small model handles the task until one of these trips, then the large one finishes it
 	smallMaxSteps = 8
+	// with a step limit, escalating grants the large model this many more steps; without one it runs until done
 	largeSteps    = 10
 	maxToolErrors = 2
 	maxTestFails  = 2
@@ -155,7 +156,7 @@ func New(o Options) (*Agent, error) {
 	a := &Agent{
 		Lean: o.Lean, WS: tools.NewWorkspace(o.Repo, o.Lean), Budget: o.Budget, Private: o.Private, Approve: o.Approve,
 		Ask: o.Ask, Emit: o.Emit, Base: gateway.URL(), Headers: hdr, FP: footprint.New(""), Memory: o.Memory, PriorNaive: o.PriorNaive,
-		Verified: "no tests run", History: o.History, naive: map[string]int{}, stepLimit: 15,
+		Verified: "no tests run", History: o.History, naive: map[string]int{},
 		Client: &http.Client{Timeout: 180 * time.Second}, Ctx: context.Background(),
 	}
 	if a.Emit == nil {
@@ -205,7 +206,9 @@ func (a *Agent) escalate(step int, reason string) bool {
 	a.FP.Escalations = append(a.FP.Escalations, footprint.Escalation{Step: step, From: a.Model, To: a.Large, Reason: reason})
 	a.Emit(Event{Kind: "escalate", To: a.Large, Reason: reason})
 	a.Model = a.Large
-	a.stepLimit = max(a.stepLimit, step+largeSteps)
+	if a.stepLimit > 0 {
+		a.stepLimit = max(a.stepLimit, step+largeSteps)
+	}
 	return true
 }
 
@@ -464,7 +467,8 @@ func (a *Agent) Note(result string) Turn {
 	return Turn{Task: a.FP.Task, Answer: result, Files: a.FilesTouched}
 }
 
-// Run executes one task and returns the model's final answer.
+// Run executes one task and returns the model's final answer. maxSteps 0 means no step limit: the task runs until
+// the model answers, the budget runs out or Ctx is cancelled.
 func (a *Agent) Run(task string, maxSteps int) (string, error) {
 	a.FP.Task = task
 	ask := a.Lean && IsQuestion(task)
@@ -517,7 +521,7 @@ func (a *Agent) loop(messages *[]Msg, maxSteps int) (string, error) {
 	lastError := ""
 	edited := false
 	a.stepLimit = maxSteps
-	for step := 1; step <= a.stepLimit; step++ {
+	for step := 1; a.stepLimit <= 0 || step <= a.stepLimit; step++ {
 		if a.onSmall() && step > smallMaxSteps {
 			a.escalate(step, fmt.Sprintf("small model not done after %d steps", smallMaxSteps))
 		}

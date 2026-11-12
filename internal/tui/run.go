@@ -32,7 +32,7 @@ func (m *Model) runTask(task string) tea.Cmd {
 		if err != nil {
 			return doneMsg{err: err}
 		}
-		result, err := ag.Run(task, 15)
+		result, err := ag.Run(task, 0)
 		if path, saveErr := ag.FP.Save(m.o.Repo+"/.slendertoken/runs", result, ag.Verified); saveErr != nil || path == "" {
 			_ = saveErr
 		}

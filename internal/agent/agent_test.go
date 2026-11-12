@@ -1,7 +1,10 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -216,5 +219,64 @@ func TestModelsAreUsedAsGivenAndOnlyGroqGetsTheFallbackChain(t *testing.T) {
 	}
 	if _, hasFallbacks := s.requests[0]["fallbacks"]; hasFallbacks {
 		t.Fatal("request carried fallbacks")
+	}
+}
+
+// steps replies with n list_files calls, then an answer.
+func steps(n int) *script {
+	var replies []func(map[string]any) (int, any)
+	for i := range n {
+		replies = append(replies, reply(callMsg(fmt.Sprint(i), "list_files", `{}`)))
+	}
+	return &script{replies: append(replies, reply(map[string]any{"role": "assistant", "content": "done"}))}
+}
+
+func TestNoStepLimitLetsTheLargeModelFinish(t *testing.T) {
+	s := steps(40)
+	o, _ := setup(t, s)
+	ag, _ := New(o)
+	got, err := ag.Run("fix it", 0)
+	if err != nil || got != "done" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if len(s.models) != 41 {
+		t.Fatalf("%d calls, want 41", len(s.models))
+	}
+	// the small model still hands over after its steps
+	if s.models[smallMaxSteps-1] != o.Small || s.models[smallMaxSteps] != o.Model || s.models[40] != o.Model {
+		t.Fatalf("models: %v", s.models)
+	}
+	if len(ag.FP.Escalations) != 1 {
+		t.Fatalf("escalations: %v", ag.FP.Escalations)
+	}
+}
+
+func TestStepLimitStillApplies(t *testing.T) {
+	s := steps(40)
+	o, _ := setup(t, s)
+	o.Small = ""
+	ag, _ := New(o)
+	got, err := ag.Run("fix it", 5)
+	if err != nil || got != "step limit reached" || len(s.models) != 5 {
+		t.Fatalf("got %q, %v after %d calls", got, err, len(s.models))
+	}
+}
+
+func TestNoStepLimitStopsWhenCancelled(t *testing.T) {
+	s := steps(1000)
+	o, _ := setup(t, s)
+	ctx, cancel := context.WithCancel(context.Background())
+	o.Ctx = ctx
+	o.Emit = func(e Event) {
+		if e.Kind == "call" && len(s.models) >= 30 {
+			cancel()
+		}
+	}
+	ag, _ := New(o)
+	if _, err := ag.Run("fix it", 0); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(s.models) > 31 {
+		t.Fatalf("kept going after cancel: %d calls", len(s.models))
 	}
 }

@@ -93,7 +93,7 @@ func runBench(args []string, out io.Writer) error {
 	only := fs.String("only", "", "run only coding or session")
 	bugList := fs.String("bugs", strings.Join(bugNames(), ","), "comma-separated coding tasks")
 	arms := fs.String("arms", "lean,naive", "comma-separated arms to run")
-	steps := fs.Int("steps", 15, "step limit per task")
+	steps := fs.Int("steps", 0, "step limit per task, 0 for none (as in the app)")
 	dst := fs.String("out", filepath.Join(dir, "results.json"), "results file")
 	if err := fs.Parse(args); err != nil {
 		return err

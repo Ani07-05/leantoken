@@ -56,7 +56,7 @@ type results struct {
 type runner struct {
 	model string
 	pause time.Duration
-	steps int
+	steps int // 0: no limit
 	ctx   context.Context
 }
 
