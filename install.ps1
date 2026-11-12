@@ -5,6 +5,9 @@
 # $env:GROQ_API_KEY runs setup without prompting; $env:SLENDERTOKEN_NO_SETUP = "1" skips it.
 # $env:SLENDERTOKEN_VERSION = "v0.2.0" pins a release.
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 defaults to old TLS and draws a progress bar that makes downloads very slow
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = "SilentlyContinue"
 $repo = "Ani07-05/slendertoken"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $file = "slendertoken_windows_$arch.zip"
@@ -14,8 +17,12 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
     Write-Host "downloading $file..."
-    Invoke-WebRequest "$base/$file" -OutFile "$tmp\$file"
-    Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt"
+    try {
+        Invoke-WebRequest "$base/$file" -OutFile "$tmp\$file"
+        Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt"
+    } catch {
+        throw "could not download $file from $base ($($_.Exception.Message)). Check that a release exists at https://github.com/$repo/releases"
+    }
     $want = ((Get-Content "$tmp\checksums.txt" | Where-Object { $_ -match " $file$" }) -split "\s+")[0]
     $got = (Get-FileHash "$tmp\$file" -Algorithm SHA256).Hash.ToLower()
     if (-not $want -or $want -ne $got) { throw "checksum mismatch for $file, refusing to install" }
