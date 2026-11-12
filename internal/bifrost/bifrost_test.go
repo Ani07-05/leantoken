@@ -16,7 +16,7 @@ import (
 )
 
 func TestWriteConfigDeclaresProviderKeyAndBudget(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	if err := WriteConfig(Spec{Providers: []KeyedProvider{{"groq", "gsk_abc"}, {"openai", "sk-oa"}}, VirtualKey: "sk-bf-123", BudgetUSD: 3}); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestFreePortSkipsBusyOnes(t *testing.T) {
 }
 
 func TestInstallDownloadsOnceAndMakesTheBinaryExecutable(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	downloads := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -127,7 +127,7 @@ func TestInstallDownloadsOnceAndMakesTheBinaryExecutable(t *testing.T) {
 }
 
 func TestInstallReportsAMissingBuild(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/latest" {
 			_, _ = w.Write([]byte(`{"name":"v1.0.0"}`))
@@ -160,7 +160,7 @@ func TestVerifyExplainsAProviderRejection(t *testing.T) {
 }
 
 func TestLoadSpecRoundTripsAndEditsProviders(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	if err := WriteConfig(Spec{Providers: []KeyedProvider{{"openai", "k1"}}, VirtualKey: "sk-bf-9", BudgetUSD: 4}); err != nil {
 		t.Fatal(err)
 	}
@@ -231,4 +231,11 @@ func TestVerifyToleratesAnUnknownTestModel(t *testing.T) {
 	if err := verify(context.Background(), srv.URL, "k", ""); !errors.Is(err, errNoTestModel) {
 		t.Fatalf("err = %v", err)
 	}
+}
+
+// setHome points the user's home at dir: os.UserHomeDir reads HOME on Unix but USERPROFILE on Windows.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
 }

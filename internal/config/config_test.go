@@ -53,7 +53,7 @@ func TestSecretsAreMasked(t *testing.T) {
 
 func TestMigrateLegacyMovesOldSettingsAndRenamesKeys(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	old := GlobalEnv
 	GlobalEnv = filepath.Join(home, ".slendertoken", ".env")
 	t.Cleanup(func() { GlobalEnv = old })
@@ -72,4 +72,11 @@ func TestMigrateLegacyMovesOldSettingsAndRenamesKeys(t *testing.T) {
 	if _, err := os.Stat(legacy); err == nil {
 		t.Fatal("old directory should be gone")
 	}
+}
+
+// setHome points the user's home at dir: os.UserHomeDir reads HOME on Unix but USERPROFILE on Windows.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
 }
