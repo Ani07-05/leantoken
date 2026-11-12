@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Ani07-05/slendertoken/internal/agent"
+	"github.com/Ani07-05/slendertoken/internal/bifrost"
 	"github.com/Ani07-05/slendertoken/internal/budget"
 	"github.com/Ani07-05/slendertoken/internal/config"
 	"github.com/Ani07-05/slendertoken/internal/gateway"
@@ -26,8 +28,15 @@ func main() {
 
 func run() error {
 	config.LoadAll()
-	if len(os.Args) > 1 && os.Args[1] == "config" {
-		return config.Main(os.Args[2:])
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "config":
+			return config.Main(os.Args[2:])
+		case "setup":
+			return runSetup(os.Args[2:])
+		case "bifrost":
+			return runBifrost(os.Args[2:])
+		}
 	}
 	fs := flag.NewFlagSet("slendertoken", flag.ContinueOnError)
 	repoFlag := fs.String("repo", ".", "repo to work in")
@@ -40,6 +49,8 @@ func run() error {
 	showVersion := fs.Bool("version", false, "print the version")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: slendertoken [flags] [task]")
+		fmt.Fprintln(os.Stderr, "       slendertoken setup [--port N] [--budget USD] [--force]")
+		fmt.Fprintln(os.Stderr, "       slendertoken bifrost [start|stop|status|logs|path]")
 		fmt.Fprintln(os.Stderr, "       slendertoken config [list|set|unset|edit|path]")
 		fmt.Fprintln(os.Stderr)
 		fs.PrintDefaults()
@@ -89,11 +100,71 @@ func run() error {
 			smallModel = gateway.ResolveSmall(flagSmall)
 		}
 	}
+	if !isPrivate {
+		startManagedGateway()
+	}
 	b := budget.New(filepath.Join(repo, ".slendertoken", "budget.json"), *limit)
 	if task == "" {
 		return tui.Run(tui.Options{Repo: repo, Budget: b, Private: isPrivate, Model: largeModel, Small: smallModel, Version: version})
 	}
 	return oneShot(repo, b, isPrivate, largeModel, smallModel, task)
+}
+
+// startManagedGateway brings back the Bifrost that `slendertoken setup` installed if it is not running, for example
+// after a reboot. A gateway the user runs themselves is left alone.
+func startManagedGateway() {
+	url := gateway.URL()
+	if !bifrost.Managed() || bifrost.Healthy(url) {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "starting Bifrost...")
+	if err := bifrost.Start(context.Background(), url); err != nil {
+		fmt.Fprintln(os.Stderr, "could not start Bifrost:", err)
+	}
+}
+
+func runSetup(args []string) error {
+	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
+	port := fs.Int("port", 0, "gateway port (default: first free port from 8080)")
+	budget := fs.Float64("budget", 2, "daily budget in USD on the virtual key")
+	force := fs.Bool("force", false, "redo setup even if a working gateway is configured")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return bifrost.Setup(context.Background(), bifrost.SetupOptions{Port: *port, BudgetUSD: *budget, Force: *force}, os.Stdout)
+}
+
+func runBifrost(args []string) error {
+	cmd := ""
+	if len(args) > 0 {
+		cmd = args[0]
+	}
+	url := gateway.URL()
+	switch cmd {
+	case "start":
+		if err := bifrost.Start(context.Background(), url); err != nil {
+			return err
+		}
+		fmt.Println("Bifrost running on", url)
+	case "stop":
+		if err := bifrost.Stop(); err != nil {
+			return err
+		}
+		fmt.Println("Bifrost stopped")
+	case "status":
+		state := "stopped"
+		if bifrost.Healthy(url) {
+			state = "running"
+		}
+		fmt.Printf("%s at %s (managed by slendertoken: %v)\n", state, url, bifrost.Managed())
+	case "logs":
+		fmt.Println(bifrost.LogPath())
+	case "path":
+		fmt.Println(bifrost.Home())
+	default:
+		return errors.New("usage: slendertoken bifrost [start|stop|status|logs|path]")
+	}
+	return nil
 }
 
 func oneShot(repo string, b *budget.Budget, private bool, model, small, task string) error {
