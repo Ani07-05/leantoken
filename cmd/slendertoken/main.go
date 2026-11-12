@@ -14,6 +14,7 @@ import (
 	"github.com/Ani07-05/slendertoken/internal/budget"
 	"github.com/Ani07-05/slendertoken/internal/config"
 	"github.com/Ani07-05/slendertoken/internal/gateway"
+	"github.com/Ani07-05/slendertoken/internal/gitignore"
 	"github.com/Ani07-05/slendertoken/internal/tui"
 )
 
@@ -106,6 +107,7 @@ func run() error {
 	if !isPrivate {
 		startManagedGateway()
 	}
+	_ = gitignore.Ensure(repo)
 	b := budget.New(filepath.Join(repo, ".slendertoken", "budget.json"), *limit)
 	if task == "" {
 		return tui.Run(tui.Options{Repo: repo, Budget: b, Private: isPrivate, Model: largeModel, Small: smallModel, Version: version})
