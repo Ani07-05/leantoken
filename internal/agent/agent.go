@@ -36,7 +36,7 @@ const (
 	elideTo  = 120
 	// the naive twin gets a generous output cap too, so one giant listing cannot inflate the savings figure
 	naiveCap = 30_000
-	// Groq free tier caps tokens per minute per model, so a rate-limited call retries on another model's budget
+	// Groq's free tier caps tokens per minute per model, so a rate-limited Groq call retries on another model's budget
 	rateLimitWaits = 4
 	// right-size routing: the small model handles the task until one of these trips, then the large one finishes it
 	smallMaxSteps = 8
@@ -178,17 +178,17 @@ func New(o Options) (*Agent, error) {
 		a.Large = a.Model
 		return a, nil
 	}
-	a.Large = gateway.GroqModel(o.Model)
+	a.Large = o.Model
 	a.Model = a.Large
 	if o.Small != "" {
-		a.Model = gateway.GroqModel(o.Small)
+		a.Model = o.Small
 	}
 	for _, m := range strings.Split(os.Getenv("SLENDERTOKEN_FALLBACKS"), ",") {
 		if m = strings.TrimSpace(m); m != "" {
 			a.Fallbacks = append(a.Fallbacks, m)
 		}
 	}
-	if len(a.Fallbacks) == 0 {
+	if len(a.Fallbacks) == 0 && strings.HasPrefix(a.Large, "groq/") {
 		a.Fallbacks = groqChain
 	}
 	return a, nil

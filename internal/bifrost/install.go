@@ -1,5 +1,5 @@
 // Package bifrost installs, configures and runs the Bifrost gateway that every model call goes through, so a fresh
-// machine needs nothing but the slendertoken binary and a Groq key.
+// machine needs nothing but the slendertoken binary and an API key from any provider.
 package bifrost
 
 import (

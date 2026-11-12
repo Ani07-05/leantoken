@@ -93,56 +93,101 @@ func (p *permission) view(width int) string {
 	return panelBox(pal.Warn, width, b.String())
 }
 
-// picker is a single-choice list. onMove previews each highlighted item; onCancel undoes the preview.
+// picker is a single-choice list; typing filters it, which matters when a provider such as OpenRouter lists hundreds of
+// models. onMove previews each highlighted item; onCancel undoes the preview.
 type picker struct {
 	title    string
 	items    []string
 	current  string
 	idx      int
+	filter   string
 	onPick   func(*Model, string) tea.Cmd
 	onMove   func(*Model, string)
 	onCancel func(*Model)
 }
 
+func (p *picker) visible() []string {
+	if p.filter == "" {
+		return p.items
+	}
+	var out []string
+	for _, it := range p.items {
+		if strings.Contains(strings.ToLower(it), strings.ToLower(p.filter)) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
 func (p *picker) key(k tea.KeyMsg, m *Model) tea.Cmd {
-	n := len(p.items)
+	list := p.visible()
+	n := len(list)
 	switch k.String() {
-	case "up", "k":
-		p.idx = (p.idx - 1 + n) % n
-	case "down", "j":
-		p.idx = (p.idx + 1) % n
+	case "up":
+		if n > 0 {
+			p.idx = (p.idx - 1 + n) % n
+		}
+	case "down":
+		if n > 0 {
+			p.idx = (p.idx + 1) % n
+		}
 	case "enter":
+		if n == 0 {
+			return nil
+		}
 		m.pick = nil
-		return p.onPick(m, p.items[p.idx])
+		return p.onPick(m, list[p.idx])
 	case "esc", "ctrl+c":
 		m.pick = nil
 		if p.onCancel != nil {
 			p.onCancel(m)
 		}
 		return nil
+	case "backspace":
+		if p.filter != "" {
+			p.filter = p.filter[:len(p.filter)-1]
+			p.idx = 0
+		}
+	default:
+		if k.Type == tea.KeyRunes {
+			p.filter += string(k.Runes)
+			p.idx = 0
+		}
 	}
-	if p.onMove != nil {
-		p.onMove(m, p.items[p.idx])
+	if list = p.visible(); p.onMove != nil && p.idx < len(list) {
+		p.onMove(m, list[p.idx])
 	}
 	return nil
 }
 
 func (p *picker) view(width int) string {
+	list := p.visible()
 	var b strings.Builder
-	b.WriteString(bold(accent(p.title)) + "\n\n")
-	start := max(0, min(p.idx-5, len(p.items)-10))
-	for i := start; i < min(len(p.items), start+10); i++ {
+	b.WriteString(bold(accent(p.title)) + "\n")
+	if len(p.items) > 12 {
+		b.WriteString(muted("filter: ") + text(p.filter) + faint("▏") + faint(fmt.Sprintf("   %d of %d", len(list), len(p.items))) + "\n")
+	}
+	b.WriteString("\n")
+	start := max(0, min(p.idx-5, len(list)-10))
+	for i := start; i < min(len(list), start+10); i++ {
 		mark := "  "
-		if p.items[i] == p.current {
+		if list[i] == p.current {
 			mark = "● "
 		}
 		if i == p.idx {
-			b.WriteString(accent("❯ "+mark) + bold(text(p.items[i])) + "\n")
+			b.WriteString(accent("❯ "+mark) + bold(text(list[i])) + "\n")
 		} else {
-			b.WriteString("  " + faint(mark) + muted(p.items[i]) + "\n")
+			b.WriteString("  " + faint(mark) + muted(list[i]) + "\n")
 		}
 	}
-	b.WriteString("\n" + faint("↑/↓ move   enter select   esc cancel"))
+	if len(list) == 0 {
+		b.WriteString(muted("  nothing matches") + "\n")
+	}
+	hint := "↑/↓ move   enter select   esc cancel"
+	if len(p.items) > 12 {
+		hint = "type to filter   " + hint
+	}
+	b.WriteString("\n" + faint(hint))
 	return panelBox(pal.Accent, width, b.String())
 }
 

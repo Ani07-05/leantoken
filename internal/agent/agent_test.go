@@ -57,7 +57,7 @@ func setup(t *testing.T, s *script) (Options, string) {
 	if err := os.WriteFile(filepath.Join(repo, "a.py"), []byte("x = 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return Options{Repo: repo, Model: "openai/gpt-oss-120b", Small: "openai/gpt-oss-20b", Lean: true,
+	return Options{Repo: repo, Model: "groq/openai/gpt-oss-120b", Small: "groq/openai/gpt-oss-20b", Lean: true,
 		Budget: budget.New(filepath.Join(repo, "b.json"), 5), Approve: func(string) bool { return true }}, repo
 }
 
@@ -194,5 +194,27 @@ func TestAskUserIsOfferedOnlyWhenTheUICanAsk(t *testing.T) {
 	raw, _ = json.Marshal(ag.Tools)
 	if !strings.Contains(string(raw), "ask_user") {
 		t.Fatal("ask_user missing with an Ask handler")
+	}
+}
+
+func TestModelsAreUsedAsGivenAndOnlyGroqGetsTheFallbackChain(t *testing.T) {
+	s := &script{replies: []func(map[string]any) (int, any){reply(map[string]any{"role": "assistant", "content": "ok"})}}
+	o, _ := setup(t, s)
+	o.Model, o.Small = "anthropic/claude-sonnet-5-5", "anthropic/claude-haiku-4-5-20251001"
+	ag, _ := New(o)
+	if ag.Model != "anthropic/claude-haiku-4-5-20251001" || ag.Large != "anthropic/claude-sonnet-5-5" {
+		t.Fatalf("models: %s %s", ag.Model, ag.Large)
+	}
+	if len(ag.Fallbacks) != 0 {
+		t.Fatalf("non-Groq models must not inherit Groq fallbacks: %v", ag.Fallbacks)
+	}
+	if _, err := ag.Run("explain this?", 15); err != nil {
+		t.Fatal(err)
+	}
+	if s.models[0] != "anthropic/claude-haiku-4-5-20251001" {
+		t.Fatalf("sent to %s", s.models[0])
+	}
+	if _, hasFallbacks := s.requests[0]["fallbacks"]; hasFallbacks {
+		t.Fatal("request carried fallbacks")
 	}
 }

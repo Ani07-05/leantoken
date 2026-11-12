@@ -31,3 +31,15 @@ func TestPriceOverride(t *testing.T) {
 		t.Fatalf("got %v,%v", in, out)
 	}
 }
+
+func TestPriceLookupIgnoresTheProviderPrefix(t *testing.T) {
+	t.Setenv("SLENDERTOKEN_PRICE", "")
+	for _, m := range []string{"groq/openai/gpt-oss-120b", "openrouter/openai/gpt-oss-120b", "openai/gpt-oss-120b"} {
+		if in, out := Price(m); in != 0.15 || out != 0.60 {
+			t.Errorf("%s: %v,%v", m, in, out)
+		}
+	}
+	if in, out := Price("anthropic/claude-sonnet-5-5"); in != defaultPrice[0] || out != defaultPrice[1] {
+		t.Errorf("unknown model should get the default price, got %v,%v", in, out)
+	}
+}

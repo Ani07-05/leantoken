@@ -497,7 +497,7 @@ func (m *Model) onModels(msg modelsMsg) tea.Cmd {
 	}
 	if msg.open {
 		if len(msg.models) == 0 {
-			return m.say(bad("Bifrost lists no Groq models"))
+			return m.say(bad("Bifrost lists no models: add a provider with `slendertoken provider add`"))
 		}
 		m.pickModels(msg.models)
 	}

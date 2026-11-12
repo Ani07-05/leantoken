@@ -3,6 +3,8 @@ package bifrost
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +17,7 @@ import (
 
 func TestWriteConfigDeclaresProviderKeyAndBudget(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	if err := WriteConfig(Spec{GroqKey: "gsk_abc", VirtualKey: "sk-bf-123", BudgetUSD: 3}); err != nil {
+	if err := WriteConfig(Spec{Providers: []KeyedProvider{{"groq", "gsk_abc"}, {"openai", "sk-oa"}}, VirtualKey: "sk-bf-123", BudgetUSD: 3}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(ConfigPath())
@@ -30,9 +32,15 @@ func TestWriteConfigDeclaresProviderKeyAndBudget(t *testing.T) {
 	if groq["value"] != "gsk_abc" || groq["name"] != "groq-main" {
 		t.Fatalf("groq key: %v", groq)
 	}
+	if oa := cfg["providers"].(map[string]any)["openai"]; oa == nil {
+		t.Fatal("second provider missing")
+	}
 	gov := cfg["governance"].(map[string]any)
 	if vk := gov["virtual_keys"].([]any)[0].(map[string]any); vk["value"] != "sk-bf-123" || vk["is_active"] != true {
 		t.Fatalf("virtual key: %v", vk)
+	}
+	if n := len(gov["virtual_keys"].([]any)[0].(map[string]any)["provider_configs"].([]any)); n != 2 {
+		t.Fatalf("virtual key allows %d providers, want 2", n)
 	}
 	if b := gov["budgets"].([]any)[0].(map[string]any); b["max_limit"] != 3.0 || b["virtual_key_id"] != "vk-slendertoken" {
 		t.Fatalf("budget: %v", b)
@@ -147,6 +155,80 @@ func TestVerifyExplainsAProviderRejection(t *testing.T) {
 	defer srv.Close()
 	err := verify(context.Background(), srv.URL, "sk-bf-1", "groq/x")
 	if err == nil || !strings.Contains(err.Error(), "Invalid API Key") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestLoadSpecRoundTripsAndEditsProviders(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := WriteConfig(Spec{Providers: []KeyedProvider{{"openai", "k1"}}, VirtualKey: "sk-bf-9", BudgetUSD: 4}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadSpec()
+	if err != nil || s.VirtualKey != "sk-bf-9" || s.BudgetUSD != 4 || len(s.Providers) != 1 {
+		t.Fatalf("spec %+v err %v", s, err)
+	}
+	s = s.With(KeyedProvider{"anthropic", "k2"}).With(KeyedProvider{"openai", "k1b"})
+	if len(s.Providers) != 2 || s.Providers[0].Key != "k1b" {
+		t.Fatalf("with: %+v", s.Providers)
+	}
+	if got := s.Without("openai").Providers; len(got) != 1 || got[0].ID != "anthropic" {
+		t.Fatalf("without: %+v", got)
+	}
+}
+
+func TestProvidersFromEnvironment(t *testing.T) {
+	for _, p := range Providers {
+		t.Setenv(p.EnvVar, "")
+	}
+	t.Setenv("ANTHROPIC_API_KEY", "a")
+	t.Setenv("OPENROUTER_API_KEY", "o")
+	got := FromEnvironment()
+	if len(got) != 2 || got[0].ID != "anthropic" || got[1].ID != "openrouter" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestEveryProviderHasUniqueIDAndEnvVar(t *testing.T) {
+	ids, envs := map[string]bool{}, map[string]bool{}
+	for _, p := range Providers {
+		if p.ID == "" || p.EnvVar == "" || ids[p.ID] || envs[p.EnvVar] {
+			t.Errorf("bad or duplicate provider %+v", p)
+		}
+		ids[p.ID], envs[p.EnvVar] = true, true
+		if (p.Small == "") != (p.Large == "") {
+			t.Errorf("%s: set both default models or neither", p.ID)
+		}
+	}
+}
+
+func TestCollectProvidersWithoutTerminalNeedsAKeyVariable(t *testing.T) {
+	for _, p := range Providers {
+		t.Setenv(p.EnvVar, "")
+	}
+	if _, err := collectProviders("", io.Discard); err == nil || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := collectProviders("nope", io.Discard); err == nil || !strings.Contains(err.Error(), "unknown provider") {
+		t.Fatalf("err = %v", err)
+	}
+	t.Setenv("MISTRAL_API_KEY", "m")
+	got, err := collectProviders("mistral", io.Discard)
+	if err != nil || len(got) != 1 || got[0].Key != "m" {
+		t.Fatalf("got %+v err %v", got, err)
+	}
+}
+
+func TestVerifyToleratesAnUnknownTestModel(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		_, _ = w.Write([]byte(`{"error":{"message":"The model gpt-x does not exist"}}`))
+	}))
+	defer srv.Close()
+	if err := verify(context.Background(), srv.URL, "k", "openai/gpt-x"); !errors.Is(err, errNoTestModel) {
+		t.Fatalf("err = %v", err)
+	}
+	if err := verify(context.Background(), srv.URL, "k", ""); !errors.Is(err, errNoTestModel) {
 		t.Fatalf("err = %v", err)
 	}
 }

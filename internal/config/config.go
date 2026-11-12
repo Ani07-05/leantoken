@@ -27,12 +27,12 @@ BIFROST_VK=
 # Ollama-only virtual key for --private runs
 BIFROST_PRIVATE_VK=
 # optional: skip the picker; otherwise run ` + "`slendertoken --pick-model`" + `
-# SLENDERTOKEN_MODEL=groq/openai/gpt-oss-120b
-# optional: small model tried first (default groq/openai/gpt-oss-20b)
-# SLENDERTOKEN_SMALL_MODEL=groq/openai/gpt-oss-20b
-# optional: grid intensity in gCO2e/kWh instead of the Groq-region default
+# SLENDERTOKEN_MODEL=anthropic/claude-sonnet-5-5
+# optional: small model tried first, written provider/model
+# SLENDERTOKEN_SMALL_MODEL=anthropic/claude-haiku-4-5-20251001
+# optional: grid intensity in gCO2e/kWh instead of the default for the serving region
 # SLENDERTOKEN_GRID_G=369
-# optional: provider/model list Bifrost tries if Groq fails
+# optional: provider/model list Bifrost tries if the main provider fails
 # SLENDERTOKEN_FALLBACKS=openai/gpt-4o-mini
 # optional: local model for --private (served by Ollama through Bifrost)
 # SLENDERTOKEN_LOCAL_MODEL=qwen2.5-coder:7b

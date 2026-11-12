@@ -12,8 +12,9 @@ import (
 	"sync"
 )
 
-// Groq USD per 1M tokens (input, output), console.groq.com/docs/models, Nov 2026.
-// Unpublished prices get defaultPrice so the limit still binds; override with SLENDERTOKEN_PRICE="in,out".
+// USD per 1M tokens (input, output) for the models this was built against (Groq list prices, Nov 2026). Any other model
+// gets defaultPrice so the local limit still binds; set SLENDERTOKEN_PRICE="in,out" for exact figures. Bifrost's own
+// budget on the virtual key is the real limit.
 var prices = map[string][2]float64{
 	"openai/gpt-oss-120b": {0.15, 0.60},
 	"openai/gpt-oss-20b":  {0.075, 0.30},
@@ -32,8 +33,13 @@ func Price(model string) (in, out float64) {
 		out, _ = strconv.ParseFloat(strings.TrimSpace(b), 64)
 		return in, out
 	}
-	if p, ok := prices[strings.TrimPrefix(model, "groq/")]; ok {
+	if p, ok := prices[model]; ok {
 		return p[0], p[1]
+	}
+	if _, rest, ok := strings.Cut(model, "/"); ok {
+		if p, ok := prices[rest]; ok {
+			return p[0], p[1]
+		}
 	}
 	return defaultPrice[0], defaultPrice[1]
 }

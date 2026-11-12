@@ -42,9 +42,15 @@ var (
 )
 
 func modelParams(model string) (total, active float64) {
-	m := strings.TrimPrefix(model, "groq/")
+	m := model
 	if p, ok := params[m]; ok {
 		return p[0], p[1]
+	}
+	if _, rest, ok := strings.Cut(model, "/"); ok {
+		m = rest
+		if p, ok := params[m]; ok {
+			return p[0], p[1]
+		}
 	}
 	p := 70.0
 	if all := sizeRe.FindAllStringSubmatch(strings.ToLower(m), -1); len(all) > 0 {
@@ -229,7 +235,7 @@ func (f *Footprint) Report(result, verified string) string {
 			regions = "?"
 		}
 		lines = append(lines, fmt.Sprintf("energy     %.4f Wh  (EcoLogits estimate, PUE %.1f)", t.KWh*1000, PUE),
-			fmt.Sprintf("carbon     %.3f mgCO2e  (Groq region %s, grid %.0f g/kWh)", t.GCO2e*1000, regions, Grid(first(t.Regions))))
+			fmt.Sprintf("carbon     %.3f mgCO2e  (region %s, grid %.0f g/kWh)", t.GCO2e*1000, regions, Grid(first(t.Regions))))
 	}
 	names := make([]string, 0, len(t.ByModel))
 	for m := range t.ByModel {

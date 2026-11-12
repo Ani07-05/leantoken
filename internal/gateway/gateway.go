@@ -1,4 +1,4 @@
-// Package gateway holds Bifrost connection settings, Groq model discovery and the saved model choice.
+// Package gateway holds Bifrost connection settings, model discovery and the saved model choice.
 package gateway
 
 import (
@@ -18,6 +18,7 @@ import (
 	"github.com/Ani07-05/slendertoken/internal/config"
 )
 
+// DefaultSmall is the first model for the one provider that has a long-standing default; other providers are picked in the app.
 const DefaultSmall = "groq/openai/gpt-oss-20b"
 
 // speech and classifier models can't run the agent
@@ -59,13 +60,6 @@ func LocalModel() string {
 	return "ollama/" + m
 }
 
-func GroqModel(m string) string {
-	if strings.HasPrefix(m, "groq/") {
-		return m
-	}
-	return "groq/" + m
-}
-
 func ListModels() ([]string, error) {
 	h, _ := Headers(false)
 	req, _ := http.NewRequest(http.MethodGet, URL()+"/v1/models", nil)
@@ -90,7 +84,7 @@ func ListModels() ([]string, error) {
 	_ = json.Unmarshal(body, &parsed)
 	var models []string
 	for _, m := range parsed.Data {
-		if strings.HasPrefix(m.ID, "groq/") && !hasAny(m.ID, nonChat) {
+		if strings.Contains(m.ID, "/") && !hasAny(m.ID, nonChat) {
 			models = append(models, m.ID)
 		}
 	}
@@ -193,7 +187,7 @@ func PickModel() (string, error) {
 		return "", err
 	}
 	if len(models) == 0 {
-		return "", errors.New("Bifrost lists no Groq models: add the Groq provider in the Bifrost UI first")
+		return "", errors.New("Bifrost lists no models: add a provider first with `slendertoken provider add`")
 	}
 	in := bufio.NewReader(os.Stdin)
 	model := choose(in, models, "large model number: ", false)
@@ -215,8 +209,16 @@ func ResolveModel(flag string) (string, error) {
 	return PickModel()
 }
 
-// ResolveSmall: --small flag > SLENDERTOKEN_SMALL_MODEL > saved choice > default.
-func ResolveSmall(flag *string) string {
+// TestModel is a model to send a tiny test request to: the saved first model, else the saved large one.
+func TestModel() string {
+	if m, ok := SavedSmall(); ok && m != "" {
+		return m
+	}
+	return SavedModel()
+}
+
+// ResolveSmall: --small flag > SLENDERTOKEN_SMALL_MODEL > saved choice > the Groq default when the large model is a Groq one.
+func ResolveSmall(flag *string, large string) string {
 	if flag != nil {
 		return *flag
 	}
@@ -226,5 +228,8 @@ func ResolveSmall(flag *string) string {
 	if m, ok := SavedSmall(); ok {
 		return m
 	}
-	return DefaultSmall
+	if strings.HasPrefix(large, "groq/") {
+		return DefaultSmall
+	}
+	return ""
 }

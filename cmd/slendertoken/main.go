@@ -36,12 +36,14 @@ func run() error {
 			return runSetup(os.Args[2:])
 		case "bifrost":
 			return runBifrost(os.Args[2:])
+		case "provider":
+			return bifrost.ProviderCommand(context.Background(), os.Args[2:], os.Stdout)
 		}
 	}
 	fs := flag.NewFlagSet("slendertoken", flag.ContinueOnError)
 	repoFlag := fs.String("repo", ".", "repo to work in")
-	model := fs.String("model", "", "large Groq model via Bifrost (default: SLENDERTOKEN_MODEL or your saved pick)")
-	small := fs.String("small", "", "first model, tried before the large one (default: "+gateway.DefaultSmall+")")
+	model := fs.String("model", "", "large model, written provider/model (for example openai/gpt-4o) (default: SLENDERTOKEN_MODEL or your saved pick)")
+	small := fs.String("small", "", "first model, tried before the large one")
 	noRoute := fs.Bool("no-route", false, "use only the large model")
 	pick := fs.Bool("pick-model", false, "pick the large and first models and save them")
 	limit := fs.Float64("budget", 0.50, "USD limit, persisted across runs")
@@ -49,7 +51,8 @@ func run() error {
 	showVersion := fs.Bool("version", false, "print the version")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: slendertoken [flags] [task]")
-		fmt.Fprintln(os.Stderr, "       slendertoken setup [--port N] [--budget USD] [--force]")
+		fmt.Fprintln(os.Stderr, "       slendertoken setup [--provider NAME] [--port N] [--budget USD] [--force]")
+		fmt.Fprintln(os.Stderr, "       slendertoken provider [list|add [NAME]|remove NAME]")
 		fmt.Fprintln(os.Stderr, "       slendertoken bifrost [start|stop|status|logs|path]")
 		fmt.Fprintln(os.Stderr, "       slendertoken config [list|set|unset|edit|path]")
 		fmt.Fprintln(os.Stderr)
@@ -97,7 +100,7 @@ func run() error {
 			if fs.Lookup("small").Value.String() != "" {
 				flagSmall = small
 			}
-			smallModel = gateway.ResolveSmall(flagSmall)
+			smallModel = gateway.ResolveSmall(flagSmall, largeModel)
 		}
 	}
 	if !isPrivate {
@@ -128,10 +131,11 @@ func runSetup(args []string) error {
 	port := fs.Int("port", 0, "gateway port (default: first free port from 8080)")
 	budget := fs.Float64("budget", 2, "daily budget in USD on the virtual key")
 	force := fs.Bool("force", false, "redo setup even if a working gateway is configured")
+	provider := fs.String("provider", "", "set up only this provider (openai, anthropic, gemini, groq, openrouter, ...)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return bifrost.Setup(context.Background(), bifrost.SetupOptions{Port: *port, BudgetUSD: *budget, Force: *force}, os.Stdout)
+	return bifrost.Setup(context.Background(), bifrost.SetupOptions{Port: *port, BudgetUSD: *budget, Force: *force, Provider: *provider}, os.Stdout)
 }
 
 func runBifrost(args []string) error {
