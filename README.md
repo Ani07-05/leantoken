@@ -18,6 +18,8 @@
 
 <sub>Run <code>slendertoken</code> in any folder. It opens a full-screen TUI.</sub>
 
+<a href="https://slendertoken.vercel.app">slendertoken.vercel.app</a>
+
 </div>
 
 Built for the Geek Room Global AI Hackathon, theme: *Build a Coding Agent That Gets the Job Done on the Fewest Tokens*. Every model call goes through the [Bifrost](https://github.com/maximhq/bifrost) gateway.
