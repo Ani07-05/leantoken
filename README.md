@@ -1,15 +1,20 @@
 <div align="center">
 
-# slendertoken
+<pre>
+ ███████╗██╗     ███████╗███╗   ██╗██████╗ ███████╗██████╗ ████████╗ ██████╗ ██╗  ██╗███████╗███╗   ██╗
+ ██╔════╝██║     ██╔════╝████╗  ██║██╔══██╗██╔════╝██╔══██╗╚══██╔══╝██╔═══██╗██║ ██╔╝██╔════╝████╗  ██║
+ ███████╗██║     █████╗  ██╔██╗ ██║██║  ██║█████╗  ██████╔╝   ██║   ██║   ██║█████╔╝ █████╗  ██╔██╗ ██║
+ ╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗   ██║   ██║   ██║██╔═██╗ ██╔══╝  ██║╚██╗██║
+ ███████║███████╗███████╗██║ ╚████║██████╔╝███████╗██║  ██║   ██║   ╚██████╔╝██║  ██╗███████╗██║ ╚████║
+ ╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝
+</pre>
 
 **A coding agent that finishes real dev tasks on the fewest tokens, and reports what each task cost in money, energy and carbon.**
 
 ![54% fewer tokens](https://img.shields.io/badge/tokens-54%25_fewer_than_naive-10b981?style=for-the-badge)
 ![pass rate](https://img.shields.io/badge/pass_rate-4%2F4-5c9cf5?style=for-the-badge)
-![python](https://img.shields.io/badge/python-3.10+-f5a742?style=for-the-badge)
+![go](https://img.shields.io/badge/go-1.22+-00add8?style=for-the-badge)
 ![gateway](https://img.shields.io/badge/gateway-Bifrost-808080?style=for-the-badge)
-
-<img src="docs/home.svg" alt="slendertoken opening in the terminal" width="860">
 
 <sub>Run <code>slendertoken</code> in any folder. It opens a full-screen TUI.</sub>
 
@@ -21,11 +26,7 @@ Built for the Geek Room Global AI Hackathon, theme: *Build a Coding Agent That G
 
 ## See it work
 
-<div align="center">
-<img src="docs/working.svg" alt="slendertoken working on a task, with the live savings sidebar" width="860">
-</div>
-
-While a task runs, a pixel animal tells you what the agent is doing, and the sidebar tracks tokens used against a naive twin of every request, cost, energy and carbon.
+While a task runs, a pixel animal tells you what the agent is doing, and the sidebar tracks tokens used against a naive twin of every request, cost, energy and carbon. Edits show as numbered diffs with green and red bands.
 
 <div align="center">
 <img src="docs/animals.png" alt="Six pixel animals: bunny thinking, frog typing, cat searching, owl reading, penguin in the shell, octopus on the web" width="720">
@@ -40,14 +41,14 @@ curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.
 irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex         # Windows
 ```
 
-One static binary, no Python or Node needed. Then:
+That one command does everything:
 
-```
-npx -y @maximhq/bifrost     # gateway on http://localhost:8080
-slendertoken                   # first run opens Settings: paste your virtual key, ctrl+s
-```
+1. Downloads the single `slendertoken` binary for your system and checks its SHA-256 (no Python, Node or Go needed).
+2. Runs `slendertoken setup`, which asks for your free [Groq key](https://console.groq.com/keys) (input hidden).
+3. Downloads [Bifrost](https://github.com/maximhq/bifrost), writes its config (Groq provider plus a virtual key with a daily budget), and starts it in the background on a free port.
+4. Saves the settings and sends one tiny request through the whole path to prove it works.
 
-From source: `go build -o slendertoken ./cmd/slendertoken` (Go 1.22+).
+Then run `slendertoken` in any repo. Set `GROQ_API_KEY` first to skip the prompt, or `SLENDERTOKEN_NO_SETUP=1` to install only. From source: `go build -o slendertoken ./cmd/slendertoken` (Go 1.22+).
 
 ## What it does
 
@@ -77,20 +78,18 @@ flowchart LR
 
 ## Install
 
-Use the one-line installer from [Quick start](#see-it-work), or download a binary from the GitHub releases page (macOS, Linux, Windows; arm64 and amd64), or build with `go build -o slendertoken ./cmd/slendertoken`. Bifrost needs Node 18+:
+Use the one-line installer from [Quick start](#see-it-work), or download a binary from the GitHub releases page (macOS, Linux, Windows; arm64 and amd64) and run `slendertoken setup` yourself.
 
 ```
-npx -y @maximhq/bifrost        # gateway + UI on http://localhost:8080
+slendertoken setup                 # download Bifrost, configure Groq + budget, start it, test it
+slendertoken setup --budget 5      # daily budget in USD on the virtual key (default 2)
+slendertoken setup --force         # redo it, for example with a new Groq key
+slendertoken bifrost status        # also: start, stop, logs, path
 ```
 
-In the Bifrost UI:
-1. Add the Groq provider with your Groq API key.
-2. Create a virtual key with a budget (for example $1 per day).
-3. For private repos, add Ollama and a second key that allows only Ollama.
+Everything lives in `~/.slendertoken`: the Bifrost binary and data in `bifrost/`, your settings in `.env`. The Groq key is stored only in Bifrost's private config file there (mode 600). If the gateway is not running, for example after a reboot, `slendertoken` starts it for you.
 
-```
-slendertoken                      # first run opens Settings: paste your virtual key, ctrl+s, pick a model
-```
+Already run your own Bifrost? Skip `setup`: put its URL and virtual key in Settings (`ctrl+s`). For private repos, add Ollama and a second key that allows only Ollama in the Bifrost dashboard.
 
 Settings live in `~/.slendertoken/.env`, so slendertoken works from any folder. A `.env` in the current folder overrides them, and real environment variables override both. `slendertoken config` lists the values in effect and where each comes from (secrets masked); `config set|unset|edit|path` change them; inside the TUI, `/settings` or `ctrl+s` opens the settings page.
 
