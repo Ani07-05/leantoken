@@ -193,24 +193,9 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .rows p { margin: 0; color: var(--body-2); max-width: 34rem; }
 
 /* benchmark */
-.bench { margin-top: 2.5rem; }
 .bars { display: grid; gap: .35rem; }
-.bar-row { display: flex; align-items: center; gap: .6rem; font-family: var(--mono); font-size: .8125rem; font-variant-numeric: tabular-nums; }
-.fill { height: .95rem; border-radius: 2px; flex: none; }
-.fill.naive { background: var(--naive); }
-.fill.slender { background: var(--bar-ink); }
 .fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
 
-
-/* comparison with other agents */
-.ovh { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem; align-items: center; padding: .6rem 0; border-top: 1px solid var(--rule); }
-.ovh:last-of-type { border-bottom: 1px solid var(--rule); }
-.ovh-name { font-weight: 500; }
-.ovh-name small { display: block; font-weight: 400; font-size: .8125rem; color: var(--graphite); }
-.ovh.us .ovh-name { font-weight: 700; }
-.fine a { color: inherit; }
-.compare-h { margin: 3rem 0 .75rem; font-size: 1.25rem; font-weight: 650; letter-spacing: -.015em; }
-.compare-h:first-of-type { margin-top: 2rem; }
 
 /* setup steps */
 .steps { margin: 2rem 0 0; padding: 0; list-style: none; counter-reset: step; }
@@ -245,7 +230,6 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   .screen { grid-template-columns: 1fr; }
   .screen-side { border-left: 0; border-top: 1px solid #2a2a2a; }
   .rows li { grid-template-columns: 1fr; gap: .35rem; }
-  .ovh { grid-template-columns: 1fr; gap: .35rem; }
   .bar nav { gap: 1.25rem; }
 }
 @media (max-width: 30rem) {
@@ -265,7 +249,6 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   <a class="bar-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
   <nav aria-label="Primary">
     <a href="#install">Install</a>
-    <a href="#compare">Compare</a>
     <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
     <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme">Dark</button>
   </nav>
@@ -403,35 +386,6 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
           <li><h3>Reports its own footprint</h3><p>Tokens, cost, latency, energy and carbon for every task, using the EcoLogits method. Energy and carbon are estimates, labeled as such.</p></li>
         </ul>
       </div>
-    </div>
-  </section>
-
-  <section id="compare">
-    <div class="wrap">
-      <h2 class="h2">How it compares with other agents.</h2>
-      <div class="prose">
-        <p>We have not run Claude Code, Codex CLI or OpenCode ourselves, so there is no head-to-head here. Below are measurements other people published, with links. They use different tasks and models, so read them as context.</p>
-      </div>
-
-      <h3 class="compare-h">Tokens sent before the agent reads your prompt</h3>
-      <div class="bench" role="group" aria-label="Input tokens each agent sends for a one-word prompt">
-        <div class="ovh"><span class="ovh-name">Claude Code<small>2.1.293</small></span><div class="bar-row"><span class="fill naive" style="width:82.0%"></span>31,480</div></div>
-        <div class="ovh"><span class="ovh-name">Codex CLI<small>0.161</small></span><div class="bar-row"><span class="fill naive" style="width:38.5%"></span>14,768</div></div>
-        <div class="ovh"><span class="ovh-name">OpenCode<small>1.18.35</small></span><div class="bar-row"><span class="fill naive" style="width:35.0%"></span>13,437</div></div>
-        <div class="ovh"><span class="ovh-name">Cursor CLI<small>2026.10</small></span><div class="bar-row"><span class="fill naive" style="width:34.3%"></span>13,174</div></div>
-        <div class="ovh"><span class="ovh-name">Cline CLI<small>2.11</small></span><div class="bar-row"><span class="fill naive" style="width:14.0%"></span>5,382</div></div>
-        <div class="ovh"><span class="ovh-name">Pi<small>0.73.1</small></span><div class="bar-row"><span class="fill naive" style="width:4.9%"></span>1,894</div></div>
-        <div class="ovh us"><span class="ovh-name">slendertoken<small>our estimate, see note</small></span><div class="bar-row"><span class="fill slender" style="width:2.4%"></span>about 600</div></div>
-      </div>
-      <p class="fine">Prompt: &ldquo;reply with the single word OK&rdquo; in an empty repo, median of three runs, each agent on its default model, counting uncached input plus cache reads and writes. Source: <a href="https://testdino.com/blog/harness-overhead-benchmark">TestDino harness overhead benchmark</a>, 8 October 2026. The slendertoken figure is our own estimate from the size of its first request (system prompt, tool definitions and the prompt, at 3.5 to 4 characters per token), not a provider token count, so it carries more uncertainty than the rest. The figure is the fixed cost that goes out with every request, before any file is read.</p>
-
-      <h3 class="compare-h">Average tokens per task on the same model</h3>
-      <div class="bench" role="group" aria-label="Average tokens per task for three agents on one model">
-        <div class="ovh"><span class="ovh-name">Claude Code<small>passed 16 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:82%"></span>741,659</div></div>
-        <div class="ovh"><span class="ovh-name">OpenCode<small>passed 14 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:76.5%"></span>692,195</div></div>
-        <div class="ovh"><span class="ovh-name">Codex CLI<small>passed 16 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:73.5%"></span>664,772</div></div>
-      </div>
-      <p class="fine">Thirty tasks, all three agents on DeepSeek V4 Flash with a 900-second limit. Source: <a href="https://www.tensorlake.ai/blog/best-ai-coding-agents-2026">Tensorlake&rsquo;s 14-day test</a>. The point is that with the model held fixed, the harness alone still changes the bill. Other published comparisons disagree on which agent uses the fewest tokens, which is why we only show measurements with the method stated.</p>
     </div>
   </section>
 
