@@ -1,8 +1,10 @@
 #!/bin/sh
 # Install slendertoken on macOS or Linux:
 #   curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.sh | sh
-# Downloads the single static binary from the latest GitHub release. No Python, Node or Go needed.
-# SLENDERTOKEN_VERSION=v0.2.0 pins a release; SLENDERTOKEN_BIN_DIR overrides the install directory.
+# Downloads the single static binary from the latest GitHub release, then runs `slendertoken setup`, which installs and
+# configures the Bifrost gateway. No Python, Node or Go needed.
+# GROQ_API_KEY=gsk_... runs setup without prompting; SLENDERTOKEN_NO_SETUP=1 skips it.
+# SLENDERTOKEN_VERSION=v0.2.0 pins a release; SLENDERTOKEN_BASE_URL points at a mirror; SLENDERTOKEN_BIN_DIR overrides the install directory.
 set -eu
 
 REPO="Ani07-05/slendertoken"
@@ -19,7 +21,9 @@ case "$(uname -m)" in
   *) echo "unsupported CPU: $(uname -m)" >&2; exit 1 ;;
 esac
 
-if [ -n "${SLENDERTOKEN_VERSION:-}" ]; then
+if [ -n "${SLENDERTOKEN_BASE_URL:-}" ]; then
+  base="$SLENDERTOKEN_BASE_URL"
+elif [ -n "${SLENDERTOKEN_VERSION:-}" ]; then
   base="https://github.com/$REPO/releases/download/$SLENDERTOKEN_VERSION"
 else
   base="https://github.com/$REPO/releases/latest/download"
@@ -54,5 +58,14 @@ install -m 0755 "$tmp/slendertoken" "$dir/slendertoken"
 echo
 echo "installed $dir/slendertoken"
 case ":$PATH:" in *":$dir:"*) ;; *) echo "add it to your PATH:  export PATH=\"$dir:\$PATH\"" ;; esac
-echo "needs the Bifrost gateway:  npx -y @maximhq/bifrost"
-echo "then run:  slendertoken"
+
+# setup downloads Bifrost, stores your Groq key in its config, starts it and tests the whole path
+if [ "${SLENDERTOKEN_NO_SETUP:-}" = 1 ]; then
+  echo "skipped setup. When ready: slendertoken setup"
+elif [ -n "${GROQ_API_KEY:-}" ]; then
+  echo; "$dir/slendertoken" setup || echo "setup did not finish. Fix the problem above, then run: slendertoken setup --force"
+elif [ -r /dev/tty ]; then
+  echo; "$dir/slendertoken" setup </dev/tty || echo "setup did not finish. Fix the problem above, then run: slendertoken setup --force"
+else
+  echo "no terminal to ask for your Groq key. Run: slendertoken setup"
+fi

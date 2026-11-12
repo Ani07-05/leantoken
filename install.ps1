@@ -1,6 +1,8 @@
 # Install slendertoken on Windows:
 #   irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex
-# Downloads the single binary from the latest GitHub release. No Python, Node or Go needed.
+# Downloads the single binary from the latest GitHub release, then runs `slendertoken setup`, which installs and
+# configures the Bifrost gateway. No Python, Node or Go needed.
+# $env:GROQ_API_KEY runs setup without prompting; $env:SLENDERTOKEN_NO_SETUP = "1" skips it.
 # $env:SLENDERTOKEN_VERSION = "v0.2.0" pins a release.
 $ErrorActionPreference = "Stop"
 $repo = "Ani07-05/slendertoken"
@@ -29,8 +31,14 @@ try {
     }
     Write-Host ""
     Write-Host "installed $dir\slendertoken.exe"
-    Write-Host "needs the Bifrost gateway:  npx -y @maximhq/bifrost"
-    Write-Host "then run:  slendertoken"
+    if ($env:SLENDERTOKEN_NO_SETUP -eq "1") {
+        Write-Host "skipped setup. When ready: slendertoken setup"
+    } else {
+        # setup downloads Bifrost, stores your Groq key in its config, starts it and tests the whole path
+        Write-Host ""
+        & "$dir\slendertoken.exe" setup
+        if ($LASTEXITCODE -ne 0) { Write-Host "setup did not finish. Fix the problem above, then run: slendertoken setup --force" }
+    }
 } finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
