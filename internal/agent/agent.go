@@ -124,7 +124,9 @@ type Agent struct {
 	FilesTouched []string
 	Verified     string
 	History      []Msg
-	Client       *http.Client
+	// Messages is the last Run's full conversation, system prompt first.
+	Messages []Msg
+	Client   *http.Client
 	// Ctx cancels the running task: the in-flight request, rate-limit waits and shell commands.
 	Ctx context.Context
 
@@ -490,6 +492,7 @@ func (a *Agent) Run(task string, maxSteps int) (string, error) {
 	messages := append([]Msg{{"role": "system", "content": sys}}, a.History...)
 	messages = append(messages, Msg{"role": "user", "content": prompt})
 	defer func() {
+		a.Messages = messages
 		total := 0
 		for _, m := range messages[1+len(a.History):] {
 			if m["role"] == "tool" {

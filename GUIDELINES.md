@@ -42,11 +42,13 @@ Innovation, technical execution, problem and impact, use of AI, user experience,
 ## Run
 
 ```
-pip install -e '.[dev]' && pytest
+go build -o slendertoken ./cmd/slendertoken && go test ./...
 npx -y @maximhq/bifrost
 cp .env.example .env
 slendertoken --pick-model
 slendertoken "task" --repo path/to/repo --budget 0.50
 slendertoken "task" --private
 slendertoken "task" --no-route   # large model only, the baseline arm
+go run ./bench run              # lean vs naive benchmark -> bench/results.json
+go run ./bench chart            # bench/token-efficiency.svg from the results
 ```
