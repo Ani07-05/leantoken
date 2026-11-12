@@ -104,9 +104,9 @@ func groqKey(out io.Writer) (string, error) {
 	}
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		return "", errors.New("no terminal to ask for the Groq key: set GROQ_API_KEY and run again (get a free key at https://console.groq.com/keys)")
+		return "", errors.New("no terminal to ask for the Groq key: set GROQ_API_KEY and run again")
 	}
-	fmt.Fprint(out, "Groq API key (free at https://console.groq.com/keys), input hidden: ")
+	fmt.Fprint(out, "Groq API key (bring your own), input hidden: ")
 	raw, err := term.ReadPassword(fd)
 	fmt.Fprintln(out)
 	if err != nil {

@@ -46,7 +46,7 @@ irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | i
 That one command does everything:
 
 1. Downloads the single `slendertoken` binary for your system and checks its SHA-256 (no Python, Node or Go needed).
-2. Runs `slendertoken setup`, which asks for your free [Groq key](https://console.groq.com/keys) (input hidden).
+2. Runs `slendertoken setup`, which asks for your own [Groq API key](https://console.groq.com/keys) (bring your own key, input hidden).
 3. Downloads [Bifrost](https://github.com/maximhq/bifrost), writes its config (Groq provider plus a virtual key with a daily budget), and starts it in the background on a free port.
 4. Saves the settings and sends one tiny request through the whole path to prove it works.
 

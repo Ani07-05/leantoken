@@ -290,7 +290,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         <pre id="cmd-win" role="tabpanel" aria-labelledby="tab-win" hidden><code>irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex</code></pre>
         <button class="copy" type="button" id="copy">Copy</button>
       </div>
-      <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for your free Groq key. Then run <code>slendertoken</code> in any repo.</p>
+      <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for your Groq API key. Bring your own. Then run <code>slendertoken</code> in any repo.</p>
     </div>
 
     <div class="demo" aria-label="Sample session">
@@ -402,7 +402,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         </div>
         <ol class="steps">
           <li><div><h3>Downloads slendertoken</h3><p>A single binary for your system, checked against a published SHA-256 before it is installed. No Python, Node or Go.</p></div></li>
-          <li><div><h3>Asks for your Groq key</h3><p>Input is hidden. The key goes into a private config file in <code>~/.slendertoken</code> on your machine and nowhere else. Free keys come from console.groq.com.</p></div></li>
+          <li><div><h3>Asks for your Groq key</h3><p>Input is hidden. The key goes into a private config file in <code>~/.slendertoken</code> on your machine and nowhere else. Bring your own key; you pay Groq directly.</p></div></li>
           <li><div><h3>Installs and starts Bifrost</h3><p>It picks a free port, writes the config with a daily budget on a virtual key, and starts the gateway in the background, bound to your machine only.</p></div></li>
           <li><div><h3>Proves it works</h3><p>It sends one tiny request through the whole path. If Groq rejects the key, it says so and tells you how to fix it.</p></div></li>
         </ol>
