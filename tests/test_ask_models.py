@@ -1,10 +1,10 @@
 import asyncio
 import json
 
-from leantoken import gateway, tools, tui
-from leantoken.agent import Agent, is_question
-from leantoken.budget import Budget
-from leantoken.tools import Workspace, schemas, unrunnable
+from slendertoken import gateway, tools, tui
+from slendertoken.agent import Agent, is_question
+from slendertoken.budget import Budget
+from slendertoken.tools import Workspace, schemas, unrunnable
 
 
 def names(s):

@@ -1,5 +1,5 @@
 [project]
-name = "leantoken"
+name = "slendertoken"
 version = "0.1.0"
 description = "Coding agent that completes dev tasks on the fewest tokens"
 requires-python = ">=3.10"
@@ -10,11 +10,11 @@ dev = ["pytest>=8"]
 build = ["pyinstaller>=6"]
 
 [project.scripts]
-leantoken = "leantoken.cli:main"
+slendertoken = "slendertoken.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["leantoken"]
+packages = ["slendertoken"]

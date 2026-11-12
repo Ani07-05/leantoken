@@ -45,8 +45,8 @@ Innovation, technical execution, problem and impact, use of AI, user experience,
 pip install -e '.[dev]' && pytest
 npx -y @maximhq/bifrost
 cp .env.example .env
-leantoken --pick-model
-leantoken "task" --repo path/to/repo --budget 0.50
-leantoken "task" --private
-leantoken "task" --no-route   # large model only, the baseline arm
+slendertoken --pick-model
+slendertoken "task" --repo path/to/repo --budget 0.50
+slendertoken "task" --private
+slendertoken "task" --no-route   # large model only, the baseline arm
 ```

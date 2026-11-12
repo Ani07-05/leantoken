@@ -4,9 +4,9 @@ import pytest
 
 import httpx
 
-from leantoken import web
-from leantoken.tools import Workspace, needs_approval, schemas
-from leantoken.tui import brief, diff_text
+from slendertoken import web
+from slendertoken.tools import Workspace, needs_approval, schemas
+from slendertoken.tui import brief, diff_text
 
 
 class Resp:
@@ -53,8 +53,8 @@ def test_web_tool_only_listed_when_enabled_and_never_asks():
 
 
 def test_private_agent_never_gets_web_search(tmp_path, monkeypatch):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-x")
     monkeypatch.setenv("BIFROST_PRIVATE_VK", "sk-bf-private")
@@ -65,8 +65,8 @@ def test_private_agent_never_gets_web_search(tmp_path, monkeypatch):
 
 
 def test_events_reach_the_ui(tmp_path, monkeypatch):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     events = []
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "m", on_event=lambda k, **d: events.append(k))
@@ -102,7 +102,7 @@ def test_argv_with_a_whole_command_line_runs_as_a_shell_string(tmp_path):
 
 
 def test_edit_diff_marks_removed_and_added_lines():
-    from leantoken.tui import edit_diff
+    from slendertoken.tui import edit_diff
 
     d = edit_diff(json.dumps({"path": "a", "old": "x = 1\ny = 2", "new": "x = 2"}))
     assert d.plain == "- x = 1\n- y = 2\n+ x = 2"
@@ -114,14 +114,14 @@ def test_tui_runs_a_task_and_shows_the_answer(tmp_path, monkeypatch):
 
     from textual.widgets import Markdown
 
-    from leantoken import tui
-    from leantoken.budget import Budget
+    from slendertoken import tui
+    from slendertoken.budget import Budget
 
     class StubAgent:
         def __init__(self, repo, budget, private, model, small="", approve=None, on_event=None, **kw):
             self.approve, self.emit = approve, on_event
             self.verified = "tests passing"
-            from leantoken.footprint import Footprint
+            from slendertoken.footprint import Footprint
 
             self.fp = Footprint("")
             self.turn_naive = 0
@@ -174,10 +174,10 @@ def test_search_survives_binary_files(tmp_path):
 
 
 def test_groq_models_back_each_other_up_on_rate_limits(tmp_path, monkeypatch):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
-    monkeypatch.delenv("LEANTOKEN_FALLBACKS", raising=False)
+    monkeypatch.delenv("SLENDERTOKEN_FALLBACKS", raising=False)
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "openai/gpt-oss-120b", small="openai/gpt-oss-20b")
     sent = []
     agent._post = lambda body: (sent.append(body), type("R", (), {"status_code": 200, "text": "", "headers": {}, "json": lambda s: {"model": body["model"], "choices": [{"message": {"content": "ok"}}], "usage": {}}})())[1]
@@ -190,8 +190,8 @@ def test_groq_models_back_each_other_up_on_rate_limits(tmp_path, monkeypatch):
 def test_slash_hint_lists_matches_and_tab_completes(tmp_path):
     import asyncio
 
-    from leantoken import tui
-    from leantoken.budget import Budget
+    from slendertoken import tui
+    from slendertoken.budget import Budget
 
     app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
 
@@ -213,8 +213,8 @@ def test_help_command_opens_session_with_help_text(tmp_path):
 
     from textual.widgets import Markdown
 
-    from leantoken import tui
-    from leantoken.budget import Budget
+    from slendertoken import tui
+    from slendertoken.budget import Budget
 
     app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
 
@@ -229,8 +229,8 @@ def test_help_command_opens_session_with_help_text(tmp_path):
 
 
 def test_savings_measure_what_a_naive_agent_would_have_sent(tmp_path):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     (tmp_path / "big.txt").write_text("x" * 40_000)
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m")
@@ -261,8 +261,8 @@ def _ask_in_tui(tmp_path, text, keys):
     import asyncio
     import threading
 
-    from leantoken import tui
-    from leantoken.budget import Budget
+    from slendertoken import tui
+    from slendertoken.budget import Budget
 
     app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
     result = {}
@@ -302,9 +302,9 @@ def test_permission_reject_and_shell_has_no_always(tmp_path):
 def test_long_answer_leaves_the_view_at_the_bottom(tmp_path, monkeypatch):
     import asyncio
 
-    from leantoken import tui
-    from leantoken.budget import Budget
-    from leantoken.footprint import Footprint
+    from slendertoken import tui
+    from slendertoken.budget import Budget
+    from slendertoken.footprint import Footprint
 
     class StubAgent:
         def __init__(self, *a, **k):
@@ -333,7 +333,7 @@ def test_long_answer_leaves_the_view_at_the_bottom(tmp_path, monkeypatch):
 
 
 def test_garbled_shell_commands_are_rejected_before_asking(tmp_path):
-    from leantoken.tools import unrunnable
+    from slendertoken.tools import unrunnable
 
     assert unrunnable("sh_lev sh_lev sh_lev").startswith("error: command not found: sh_lev")
     for ok in ("git status", "FOO=1 ls -l", "cd x && ls", "[ -f a ]", "./run.sh", "git log --oneline"):
@@ -341,7 +341,7 @@ def test_garbled_shell_commands_are_rejected_before_asking(tmp_path):
 
 
 def test_recursive_ls_is_refused_with_a_hint():
-    from leantoken.tools import unrunnable
+    from slendertoken.tools import unrunnable
 
     for cmd in ("ls -R", "ls -laR src", "ls --recursive"):
         assert "Use list_files" in unrunnable(cmd), cmd
@@ -349,8 +349,8 @@ def test_recursive_ls_is_refused_with_a_hint():
 
 
 def test_one_huge_output_cannot_inflate_savings(tmp_path):
-    from leantoken.agent import NAIVE_CAP, Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import NAIVE_CAP, Agent
+    from slendertoken.budget import Budget
 
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m")
     agent.naive["c1"] = NAIVE_CAP
@@ -361,7 +361,7 @@ def test_one_huge_output_cannot_inflate_savings(tmp_path):
 
 
 def test_memory_note_is_compact_and_drops_oldest_first():
-    from leantoken.agent import memory_note
+    from slendertoken.agent import memory_note
 
     turns = [{"task": f"task {i}", "answer": "a" * 400, "files": ["x.py"] if i == 2 else []} for i in range(10)]
     note = memory_note(turns, cap=900)
@@ -370,8 +370,8 @@ def test_memory_note_is_compact_and_drops_oldest_first():
 
 
 def test_savings_compound_when_a_naive_agent_resends_the_whole_chat(tmp_path):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     def second_turn_saved(prior_naive):
         agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m", memory="- Q: x\n  A: y", prior_naive=prior_naive)
@@ -383,8 +383,8 @@ def test_savings_compound_when_a_naive_agent_resends_the_whole_chat(tmp_path):
 
 
 def test_later_turns_get_a_memory_of_earlier_ones(tmp_path):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/m", memory="- Q: first\n  A: done")
     sent = []
@@ -409,8 +409,8 @@ def test_naive_workspace_returns_whole_files_and_unclipped_output(tmp_path):
 
 
 def test_naive_agent_sends_everything_it_ever_saw(tmp_path):
-    from leantoken.agent import Agent
-    from leantoken.budget import Budget
+    from slendertoken.agent import Agent
+    from slendertoken.budget import Budget
 
     sent = []
 
@@ -433,3 +433,28 @@ def test_naive_agent_sends_everything_it_ever_saw(tmp_path):
     lean._post = post
     lean.run("now")
     assert sent[1]["reasoning_effort"] == "low"
+
+
+def test_theme_command_switches_and_persists(tmp_path, monkeypatch):
+    import asyncio
+
+    from slendertoken import config, tui
+    from slendertoken.budget import Budget
+
+    monkeypatch.setattr(config, "GLOBAL_ENV", tmp_path / ".env")
+    monkeypatch.setenv("BIFROST_VK", "k")
+    app = tui.TUI(tmp_path, Budget(tmp_path / "b.json", 1.0), False, "groq/big", "groq/small")
+
+    async def go():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.command("/theme nord")
+            await pilot.pause()
+            assert app.theme == "lt-nord" and tui.ACCENT == "#88c0d0"
+            assert config.parse(tmp_path / ".env")["SLENDERTOKEN_THEME"] == "nord"
+            app.command("/theme nope")
+            await pilot.pause()
+            assert app.theme == "lt-nord"
+
+    asyncio.run(go())
+    tui.apply_palette(tui.themes.get(None))

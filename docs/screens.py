@@ -13,9 +13,9 @@ os.environ["BIFROST_VK"] = "sk-bf-demo"
 
 from PIL import Image  # noqa: E402
 
-from leantoken import art, tui
-from leantoken.budget import Budget
-from leantoken.footprint import Footprint
+from slendertoken import art, tui
+from slendertoken.budget import Budget
+from slendertoken.footprint import Footprint
 
 HERE = Path(__file__).parent
 SIZE = (120, 36)
@@ -52,11 +52,11 @@ async def shoot() -> None:
         await pilot.pause(0.5)
         app.gateway_ok = True
         app.refresh_chrome()
-        (HERE / "home.svg").write_text(app.export_screenshot(title="leantoken"))
+        (HERE / "home.svg").write_text(app.export_screenshot(title="slendertoken"))
         await pilot.press(*"fix the failing discount test", "enter")
         await pilot.pause(4.5)
         app.gateway_ok = True
-        (HERE / "working.svg").write_text(app.export_screenshot(title="leantoken"))
+        (HERE / "working.svg").write_text(app.export_screenshot(title="slendertoken"))
         app.workers.cancel_all()
 
 

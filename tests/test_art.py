@@ -1,6 +1,6 @@
 import pytest
 
-from leantoken import art
+from slendertoken import art
 
 
 @pytest.mark.parametrize("scene", list(art.SCENE_ANIMAL))
@@ -15,6 +15,6 @@ def test_every_tool_maps_to_a_scene():
 
 
 def test_empty_shell_command_is_rejected_before_approval():
-    from leantoken.tools import unrunnable
+    from slendertoken.tools import unrunnable
 
     assert unrunnable("  ").startswith("error: empty command")

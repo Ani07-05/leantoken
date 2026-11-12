@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from leantoken.budget import Budget, BudgetExceeded
-from leantoken.tools import Workspace, needs_approval
+from slendertoken.budget import Budget, BudgetExceeded
+from slendertoken.tools import Workspace, needs_approval
 
 
 def test_path_escape_blocked(tmp_path):
@@ -52,11 +52,11 @@ def _reply(model="groq/openai/gpt-oss-120b"):
 
 
 def _agent(tmp_path, monkeypatch, private=False, responses=None, small=""):
-    from leantoken.agent import Agent
+    from slendertoken.agent import Agent
 
     monkeypatch.setenv("BIFROST_VK", "sk-bf-user")
     monkeypatch.setenv("BIFROST_PRIVATE_VK", "sk-bf-private")
-    monkeypatch.setenv("LEANTOKEN_FALLBACKS", "openai/gpt-4o-mini")
+    monkeypatch.setenv("SLENDERTOKEN_FALLBACKS", "openai/gpt-4o-mini")
     agent = Agent(tmp_path, Budget(tmp_path / "b.json", 1.0), private, "openai/gpt-oss-120b",
                   approve=lambda _: True, small=small)
     sent = []
@@ -87,7 +87,7 @@ def test_private_run_uses_ollama_key_and_no_fallbacks(tmp_path, monkeypatch):
 
 
 def test_private_run_requires_private_key(tmp_path, monkeypatch):
-    from leantoken.agent import Agent
+    from slendertoken.agent import Agent
 
     monkeypatch.delenv("BIFROST_PRIVATE_VK", raising=False)
     with pytest.raises(SystemExit):
@@ -157,7 +157,7 @@ def test_no_route_uses_large_only(tmp_path, monkeypatch):
 
 
 def test_footprint_energy_and_report(tmp_path):
-    from leantoken.footprint import Footprint, energy_kwh, gpus
+    from slendertoken.footprint import Footprint, energy_kwh, gpus
 
     assert gpus(117) == 4 and gpus(21) == 1
     assert energy_kwh("groq/openai/gpt-oss-120b", 100, 1.0) > energy_kwh("groq/openai/gpt-oss-20b", 100, 1.0) > 0
@@ -171,7 +171,7 @@ def test_footprint_energy_and_report(tmp_path):
 
 
 def test_rate_limit_waits_then_retries(tmp_path, monkeypatch):
-    import leantoken.agent as agent_mod
+    import slendertoken.agent as agent_mod
 
     monkeypatch.setattr(agent_mod.time, "sleep", lambda s: None)
     limited = FakeResponse(429, text="rate limited", headers={"x-bifrost-retry-after-ms": "2000"})
@@ -187,7 +187,7 @@ def test_edit_tolerates_tab_indent(tmp_path):
 
 
 def test_grid_follows_groq_region():
-    from leantoken.footprint import Footprint
+    from slendertoken.footprint import Footprint
 
     fp = Footprint("t")
     mumbai = fp.add("groq/openai/gpt-oss-20b", 100, 100, 1.0, region="bom")
@@ -201,7 +201,7 @@ def test_read_file_accepts_guessed_range_names(tmp_path):
 
 
 def test_bash_wrapper_unwrapped():
-    from leantoken.tools import unwrap
+    from slendertoken.tools import unwrap
 
     assert unwrap(["bash", "-lc", "pytest -q"]) == "pytest -q"
     assert unwrap(["python", "-m", "pytest"]) == ["python", "-m", "pytest"]
@@ -209,7 +209,7 @@ def test_bash_wrapper_unwrapped():
 
 
 def test_private_cli_never_resolves_cloud_models(tmp_path, monkeypatch):
-    from leantoken import cli
+    from slendertoken import cli
 
     def boom(*a, **k):
         raise AssertionError("private run touched the Groq model list")
@@ -227,7 +227,7 @@ def test_private_cli_never_resolves_cloud_models(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "resolve_model", boom)
     monkeypatch.setattr(cli, "resolve_small", boom)
     monkeypatch.setattr(cli, "Agent", StubAgent)
-    monkeypatch.setattr("sys.argv", ["leantoken", "task", "--private", "--repo", str(tmp_path)])
+    monkeypatch.setattr("sys.argv", ["slendertoken", "task", "--private", "--repo", str(tmp_path)])
     cli.main()
     assert seen == {"private": True, "model": "", "small": ""}
 
@@ -235,7 +235,7 @@ def test_private_cli_never_resolves_cloud_models(tmp_path, monkeypatch):
 def test_tui_private_toggle_needs_the_private_key(tmp_path, monkeypatch):
     import asyncio
 
-    from leantoken import tui
+    from slendertoken import tui
 
     monkeypatch.setenv("BIFROST_VK", "sk-bf-x")
     monkeypatch.delenv("BIFROST_PRIVATE_VK", raising=False)
@@ -255,7 +255,7 @@ def test_tui_private_toggle_needs_the_private_key(tmp_path, monkeypatch):
 
 
 def test_network_commands_are_blocked_in_private_runs():
-    from leantoken.tools import network_command
+    from slendertoken.tools import network_command
 
     for cmd in ("curl https://x.io", "cd app && wget x", "git push origin main", "FOO=1 pip install requests", "/usr/bin/ssh host", "npx foo"):
         assert network_command(cmd), cmd
@@ -271,7 +271,7 @@ def test_private_agent_refuses_a_network_shell_command(tmp_path, monkeypatch):
 
 
 def test_local_run_reports_no_energy_estimate():
-    from leantoken.footprint import Footprint
+    from slendertoken.footprint import Footprint
 
     fp = Footprint("t")
     fp.add("ollama/qwen2.5-coder:7b", 100, 50, 2.0, local=True)

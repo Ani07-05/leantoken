@@ -1,4 +1,4 @@
-"""Benchmark: the same model on the same tasks, with and without leantoken's token controls.
+"""Benchmark: the same model on the same tasks, with and without slendertoken's token controls.
 
   .venv/bin/python bench/run.py --model groq/openai/gpt-oss-120b
 
@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from make_repo import BUGS, build  # noqa: E402
 
-from leantoken.agent import Agent, memory_note  # noqa: E402
-from leantoken.budget import Budget  # noqa: E402
+from slendertoken.agent import Agent, memory_note  # noqa: E402
+from slendertoken.budget import Budget  # noqa: E402
 
 CODING_PROMPT = "The tests in this project are failing. Run them, find the bug and fix it."
 # every expected group must appear (any word within a group) in the lowercased answer

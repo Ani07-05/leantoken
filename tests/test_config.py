@@ -1,6 +1,6 @@
 import os
 
-from leantoken import config
+from slendertoken import config
 
 
 def use_tmp(monkeypatch, tmp_path):
@@ -42,8 +42,8 @@ def test_secrets_masked():
 def test_settings_page_opens_without_key_and_saves(monkeypatch, tmp_path):
     import asyncio
 
-    from leantoken import tui
-    from leantoken.budget import Budget
+    from slendertoken import tui
+    from slendertoken.budget import Budget
 
     use_tmp(monkeypatch, tmp_path)
     monkeypatch.delenv("BIFROST_VK")

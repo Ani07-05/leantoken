@@ -6,8 +6,8 @@ from pathlib import Path
 
 import httpx
 
-CONFIG = Path.home() / ".leantoken" / "config.json"
-MODELS_CACHE = Path.home() / ".leantoken" / "models.json"
+CONFIG = Path.home() / ".slendertoken" / "config.json"
+MODELS_CACHE = Path.home() / ".slendertoken" / "models.json"
 DEFAULT_SMALL = "groq/openai/gpt-oss-20b"
 # speech and classifier models can't run the agent
 NON_CHAT = ("whisper", "tts", "orpheus", "playai", "guard")
@@ -26,7 +26,7 @@ def headers(private: bool = False) -> dict:
 
 
 def local_model() -> str:
-    return "ollama/" + os.environ.get("LEANTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
+    return "ollama/" + os.environ.get("SLENDERTOKEN_LOCAL_MODEL", "qwen2.5-coder:7b")
 
 
 def groq_model(model: str) -> str:
@@ -113,13 +113,13 @@ def pick_model() -> str:
 
 
 def resolve_model(flag: str | None) -> str:
-    """--model flag > LEANTOKEN_MODEL > saved choice > interactive pick."""
-    return flag or os.environ.get("LEANTOKEN_MODEL") or saved_model() or pick_model()
+    """--model flag > SLENDERTOKEN_MODEL > saved choice > interactive pick."""
+    return flag or os.environ.get("SLENDERTOKEN_MODEL") or saved_model() or pick_model()
 
 
 def resolve_small(flag: str | None) -> str:
-    """--small flag > LEANTOKEN_SMALL_MODEL > saved choice > default."""
+    """--small flag > SLENDERTOKEN_SMALL_MODEL > saved choice > default."""
     if flag is not None:
         return flag
-    small = os.environ.get("LEANTOKEN_SMALL_MODEL") or saved_small()
+    small = os.environ.get("SLENDERTOKEN_SMALL_MODEL") or saved_small()
     return DEFAULT_SMALL if small is None else small

@@ -1,4 +1,4 @@
-"""Full-screen terminal UI in the style of OpenCode: conversation, bordered prompt, session sidebar."""
+"""Full-screen terminal UI: header bar, savings sidebar on the left, conversation, rounded prompt box."""
 
 import json
 import os
@@ -21,14 +21,14 @@ from .agent import Agent, memory_note
 from .budget import Budget, BudgetExceeded
 from textual_image.widget import Image
 
-from . import art
+from . import art, themes
 from .art import TOOL_SCENE, color, verb
 from .gateway import bifrost_url, cached_models, list_models, local_model, save_model
 from .tools import Workspace
 
 BAR = 20
-GOOD, BAD = "#7fd88f", "#e06c75"
 COMMANDS = {
+    "/theme": "switch color theme, e.g. /theme nord",
     "/clear": "clear the context and start fresh",
     "/models": "pick the large and first models",
     "/private": "toggle private mode",
@@ -43,12 +43,26 @@ KEYS = (("shift+tab", "cycle permission mode"), ("ctrl+b", "toggle sidebar"), ("
 HELP = ("**Commands**\n\n" + "\n".join(f"- `{c}`  {d}" for c, d in COMMANDS.items())
         + "\n\n**Prompt**\n\n- `!cmd`  run a shell command yourself\n- `@path`  mention a file; the agent reads only what it needs"
         + "\n\n**Keys**\n\n" + "\n".join(f"- `{k}`  {d}" for k, d in KEYS))
-ACCENT, WARN, TEXT, MUTED, PANEL, BG = "#5c9cf5", "#f5a742", "#eeeeee", "#808080", "#1e1e1e", "#0a0a0a"
+PAL = themes.get(None)
+ACCENT = WARN = TEXT = MUTED = FAINT = LINE = BG = GOOD = BAD = ""
+
+
+def apply_palette(p: themes.Palette) -> None:
+    """Rich text is styled from these module names at render time, so a theme switch only has to reassign them."""
+    global PAL, ACCENT, WARN, TEXT, MUTED, FAINT, LINE, BG, GOOD, BAD
+    PAL = p
+    ACCENT, WARN, TEXT, MUTED, FAINT, LINE, BG, GOOD, BAD = p.accent, p.warn, p.text, p.muted, p.faint, p.line, p.bg, p.good, p.bad
+
+
+apply_palette(PAL)
 HOLD = 15  # ticks (0.1s) an animal stays on screen, so a fast tool call is still visible
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
 GLYPHS = {
+    "s": ("█▀▀▀", "▀▀▀█", "▀▀▀▀"),
+    "d": ("   █", "█▀▀█", "▀▀▀▀"),
+    "r": ("█▀▀▄", "█   ", "▀   "),
     "l": ("█   ", "█   ", "▀▀▀▀"),
     "e": ("█▀▀█", "█▀▀▀", "▀▀▀▀"),
     "a": ("█▀▀█", "█▀▀█", "▀  ▀"),
@@ -62,8 +76,8 @@ GLYPHS = {
 def logo() -> Text:
     out = Text(justify="center")
     for row in range(3):
-        for i, ch in enumerate("leantoken"):
-            out.append(GLYPHS[ch][row] + ("" if i == 8 else " "), style=MUTED if i < 4 else TEXT)
+        for i, ch in enumerate("slendertoken"):
+            out.append(GLYPHS[ch][row] + ("" if i == 8 else " "), style=ACCENT if i < 4 else TEXT)
         out.append("\n" if row < 2 else "")
     return out
 
@@ -121,16 +135,16 @@ def edit_diff(args: str) -> Text | None:
     return out
 
 
-MODES = (("Ask", "asks before every edit and shell command", ACCENT),
-         ("Accept edits", "edits files without asking, still asks for shell", WARN),
-         ("Auto", "runs everything without asking", BAD))
+MODES = (("Ask", "asks before every edit and shell command", "accent"),
+         ("Accept edits", "edits files without asking, still asks for shell", "warn"),
+         ("Auto", "runs everything without asking", "bad"))
 LABELS = {"once": "Allow once", "always": "Allow always", "reject": "Reject"}
 # a shell command can differ every time, so "always" is only offered for file edits
 ALWAYS_KINDS = ("edit", "write")
 
 
 class Permission(Vertical):
-    """Replaces the prompt box while the agent waits for approval, like OpenCode."""
+    """Replaces the prompt box while the agent waits for approval."""
 
     can_focus = True
 
@@ -149,7 +163,7 @@ class Permission(Vertical):
         self.choices = ["once"] + (["always"] if allow_always else []) + ["reject"]
         self.index, self.done = 0, done
         head, _, body = text.partition("\n")
-        title = Text("△ ", style=WARN) + Text("Permission required", style=f"bold {WARN}")
+        title = Text("⚠ ", style=WARN) + Text("Approve?", style=f"bold {WARN}")
         title.append("   " + head.replace("shell: ", "$ ", 1), style=TEXT)
         self.query_one("#ptitle", Static).update(title)
         lines = body.rstrip().splitlines()
@@ -226,7 +240,7 @@ class ModelPicker(ModalScreen[str | None]):
 
 
 class Settings(ModalScreen[bool]):
-    """Edit ~/.leantoken/.env in place; saved values apply from the next request."""
+    """Edit ~/.slendertoken/.env in place; saved values apply from the next request."""
 
     BINDINGS = [("escape", "cancel", "cancel"), Binding("ctrl+s", "save", "save", priority=True)]
 
@@ -271,27 +285,29 @@ class Settings(ModalScreen[bool]):
 
 
 class TUI(App):
-    TITLE = "leantoken"
+    TITLE = "slendertoken"
     CSS = """
-    Screen { background: #0a0a0a; color: #eeeeee; }
+    Screen { background: $lt-bg; color: $lt-text; }
+    #top { height: 1; padding: 0 2; background: $lt-panel; color: $lt-muted; }
     #body { height: 1fr; }
     #activity { display: none; height: 2; margin-top: 1; padding: 0 2; }
     #art { width: 10; height: 2; }
     #activitytext { width: 1fr; height: 2; padding: 0 0 0 2; }
-    #hint { display: none; height: auto; margin-top: 1; padding: 0 2; background: #141414; border-left: heavy #1e1e1e; }
+    #hint { display: none; height: auto; margin-top: 1; padding: 0 2; background: $lt-panel; border: round $lt-line; }
     #hint.show { display: block; }
     #main { width: 1fr; height: 100%; padding: 0 2; }
-    #chat { height: 1fr; scrollbar-size-vertical: 1; scrollbar-background: #0a0a0a; scrollbar-color: #1e1e1e; }
-    #side { width: 38; height: 100%; padding: 1 2; background: #0f0f0f; border-left: solid #1e1e1e; color: #808080; scrollbar-size-vertical: 1; scrollbar-background: #0a0a0a; scrollbar-color: #1e1e1e; }
+    #chat { height: 1fr; scrollbar-size-vertical: 1; scrollbar-background: $lt-bg; scrollbar-color: $lt-line; }
+    #side { width: 34; height: 100%; padding: 1 2; background: $lt-panel; border-right: solid $lt-line; color: $lt-muted; scrollbar-size-vertical: 1; scrollbar-background: $lt-panel; scrollbar-color: $lt-line; }
     #sidetext { height: auto; }
     #side.hidden { display: none; }
-    #prompt { height: auto; background: #1e1e1e; border-left: heavy #5c9cf5; padding: 1 2 1 2; margin: 1 0 1 0; }
-    #prompt.busy { border-left: heavy #f5a742; }
-    #input { border: none; padding: 0; background: transparent; height: 1; color: #eeeeee; }
+    #prompt { height: auto; background: $lt-panel; border: round $lt-line; padding: 0 1; margin: 1 0 0 0; }
+    #prompt:focus-within { border: round $lt-accent; }
+    #prompt.busy { border: round $lt-warn; }
+    #input { border: none; padding: 0; background: transparent; height: 1; color: $lt-text; }
     #input:focus { border: none; background: transparent; background-tint: transparent; }
-    #input > .input--placeholder { color: #808080; text-style: none; }
-    #mode { height: 1; margin-top: 1; }
-    #foot { height: 1; padding: 0 3; }
+    #input > .input--placeholder { color: $lt-muted; text-style: none; }
+    #mode { height: 1; }
+    #foot { height: 1; padding: 0 2; background: $lt-panel; color: $lt-muted; }
     #logo { display: none; height: auto; width: 100%; margin-bottom: 2; text-align: center; }
     #body.home #logo { display: block; width: 100; max-width: 100%; }
     #body.home #chat { display: none; }
@@ -299,31 +315,31 @@ class TUI(App):
     #body.home #prompt { width: 100; max-width: 100%; margin: 0; }
     #body.home #side { display: none; }
     #body.home #activity { display: none; }
-    .user { border-left: heavy #5c9cf5; padding: 1 2; margin-top: 1; background: #1e1e1e; }
-    .answer { margin: 1 0 0 0; padding: 0 2; border-left: heavy #2a2a2a; height: auto; background: transparent; }
+    .user { border: round $lt-line; padding: 0 1; margin: 1 0 0 8; background: $lt-panel; }
+    .answer { margin: 1 0 0 0; padding: 0 1; height: auto; background: transparent; }
     .answer MarkdownParagraph, .answer Markdown > * { margin: 0 0 1 0; }
-    MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4 { color: #5c9cf5; text-style: bold; background: transparent; border: none; padding: 0; margin: 1 0 0 0; text-align: left; content-align: left top; }
-    MarkdownFence { background: #141414; margin: 0 0 1 0; padding: 0 1; max-height: 20; }
+    MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4 { color: $lt-accent; text-style: bold; background: transparent; border: none; padding: 0; margin: 1 0 0 0; text-align: left; content-align: left top; }
+    MarkdownFence { background: $lt-panel; margin: 0 0 1 0; padding: 0 1; max-height: 20; }
     MarkdownBulletList, MarkdownOrderedList { margin: 0 0 1 0; }
     MarkdownTable { margin: 0 0 1 0; }
-    .tool { color: #808080; margin: 0; }
+    .tool { color: $lt-muted; margin: 0; }
     .saved { margin: 0 0 0 2; }
-    .fail { color: #e06c75; }
-    .esc { color: #f5a742; }
-    .diff { border-left: heavy #1e1e1e; padding: 0 1; margin: 0 0 0 2; }
-    .note { color: #808080; }
+    .fail { color: $lt-bad; }
+    .esc { color: $lt-warn; }
+    .diff { border: round $lt-line; padding: 0 1; margin: 0 0 0 2; }
+    .note { color: $lt-muted; }
     ModelPicker, Settings { align: center middle; }
-    #settings { width: 90; max-width: 95%; height: 90%; border-left: heavy #5c9cf5; background: #1e1e1e; padding: 1 2; }
+    #settings { width: 90; max-width: 95%; height: 90%; border: round $lt-accent; background: $lt-panel; padding: 1 2; }
     #sfields { height: 1fr; scrollbar-size-vertical: 1; }
     .slabel { margin-top: 1; }
-    .sinput { border: none; height: 1; padding: 0 1; background: #0a0a0a; }
-    .sinput:focus { border: none; background: #141414; }
-    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border-left: heavy #5c9cf5; background: #1e1e1e; padding: 1 2; }
-    #dialog OptionList { background: #1e1e1e; border: none; padding: 0; }
+    .sinput { border: none; height: 1; padding: 0 1; background: $lt-bg; }
+    .sinput:focus { border: none; background: $lt-raised; }
+    #dialog { width: 72; max-width: 90%; height: auto; max-height: 80%; border: round $lt-accent; background: $lt-panel; padding: 1 2; }
+    #dialog OptionList { background: $lt-panel; border: none; padding: 0; }
     #dtitle { text-style: bold; margin-bottom: 1; }
-    #dhint { margin-top: 1; color: #808080; }
+    #dhint { margin-top: 1; color: $lt-muted; }
     #prompt.hidden { display: none; }
-    #perm { display: none; height: auto; background: #1e1e1e; border-left: heavy #f5a742; padding: 1 2; margin-top: 1; }
+    #perm { display: none; height: auto; background: $lt-panel; border: round $lt-warn; padding: 0 1; margin-top: 1; }
     #perm.show { display: block; }
     #pbody { margin-top: 1; }
     #popts { margin-top: 1; }
@@ -360,9 +376,19 @@ class TUI(App):
         self.scene, self.detail = "think", ""
         self.n, self.busy_since, self.scene_since, self.fade = 0, 0, 0, 0
         self.shown_until, self.pending, self.tool_running = 0, None, False
+        for p in themes.PALETTES.values():
+            self.register_theme(p.textual())
+        self.use_theme(os.environ.get("SLENDERTOKEN_THEME"))
+
+    def use_theme(self, name: str | None) -> None:
+        apply_palette(themes.get(name))
+        self.theme = f"lt-{PAL.name}"
 
     def compose(self) -> ComposeResult:
+        yield Static(id="top")
         with Horizontal(id="body", classes="home"):
+            with VerticalScroll(id="side"):
+                yield Static(id="sidetext")
             with Vertical(id="main"):
                 yield Static(logo(), id="logo")
                 yield VerticalScroll(id="chat")
@@ -374,8 +400,6 @@ class TUI(App):
                     yield Input(placeholder="Ask anything...  \"fix the failing test\"", id="input")
                     yield Static(id="mode")
                 yield Permission(id="perm")
-            with VerticalScroll(id="side"):
-                yield Static(id="sidetext")
         yield Static(id="foot")
 
     def on_mount(self) -> None:
@@ -507,22 +531,23 @@ class TUI(App):
     def refresh_chrome(self) -> None:
         self.query_one("#prompt").set_class(self.busy, "busy")
         mode = Text()
-        name, _, color = MODES[self.mode]
-        mode.append(name, style=color)
+        name, _, role = MODES[self.mode]
+        mode.append(name, style=getattr(PAL, role))
         mode.append(" · ", style=MUTED)
         mode.append_text(self.route())
         self.query_one("#mode", Static).update(mode)
         dot = MUTED if self.gateway_ok is None else GOOD if self.gateway_ok else BAD
-        left = Text("● ", style=dot) + Text("Bifrost  " if self.gateway_ok is not False else "Bifrost down  ", style=MUTED) + Text(pretty_path(self.repo), style=MUTED)
-        hints = Text()
+        left = Text("▍", style=ACCENT) + Text("slendertoken", style=f"bold {TEXT}") + Text("  " + pretty_path(self.repo), style=MUTED)
+        right = Text(PAL.name + "  ", style=FAINT) + Text("● ", style=dot) + Text("Bifrost" if self.gateway_ok is not False else "Bifrost down", style=MUTED)
+        top_gap = max(2, (self.query_one("#top").size.width or 100) - 4 - len(left.plain) - len(right.plain))
+        self.query_one("#top", Static).update(left + Text(" " * top_gap) + right)
         keys = (("shift+tab", "mode"), ("ctrl+s", "settings"), ("ctrl+q", "quit")) if self.query_one("#body").has_class("home") else \
             (("shift+tab", "mode"), ("ctrl+s", "settings"), ("ctrl+b", "sidebar"), ("ctrl+n", "new"), ("ctrl+o", "models"), ("ctrl+q", "quit"))
+        hints = Text()
         for key, label in keys:
-            hints.append(key + " ", style="#a0a0a0")
-            hints.append(label + "  " if key != "ctrl+q" else label, style="#555555")
-        width = self.query_one("#foot").size.width or 100
-        gap = max(2, width - 2 - len(left.plain) - len(hints.plain))
-        self.query_one("#foot", Static).update(left + Text(" " * gap) + hints)
+            hints.append(key + " ", style=TEXT)
+            hints.append(label + "  ", style=FAINT)
+        self.query_one("#foot", Static).update(hints)
         self.query_one("#sidetext", Static).update(self.sidebar())
 
     def on_resize(self, event: events.Resize) -> None:
@@ -555,7 +580,7 @@ class TUI(App):
                 t.append(f"~{energy(s['saved_kwh'], s['saved_gco2e'])} less\n", style=GOOD)
             t.append("█" * (BAR - cells), style=ACCENT)
             t.append("█" * cells + "\n", style=GOOD)
-            t.append("est. vs whole-file reads,\nno clipping, no trimming" + ("" if self.private else ";\nenergy scales with tokens") + "\n", style="#555555")
+            t.append("est. vs whole-file reads,\nno clipping, no trimming" + ("" if self.private else ";\nenergy scales with tokens") + "\n", style=FAINT)
         t.append("\n")
         if len(self.series) > 1:
             shown = self.series[-12:]
@@ -565,7 +590,7 @@ class TUI(App):
             t.append(spark([n for _, n in shown], top) + "\n", style=BAD)
             t.append("lean  ", style=MUTED)
             t.append(spark([u for u, _ in shown], top) + "\n", style=GOOD)
-            t.append("gap widens as the chat grows\n\n", style="#555555")
+            t.append("gap widens as the chat grows\n\n", style=FAINT)
         head("Stats")
         mins = int((time.monotonic() - self.started) // 60)
         done = s["tasks"]
@@ -583,7 +608,7 @@ class TUI(App):
         head("Budget")
         t.append(f"${spent:.4f} of ${limit:.2f}\n")
         t.append("█" * filled, style=bar_color)
-        t.append("░" * (BAR - filled) + "\n\n", style="#2a2a2a")
+        t.append("░" * (BAR - filled) + "\n\n", style=LINE)
         head("Gateway")
         up = self.gateway_ok
         t.append("● ", style=MUTED if up is None else GOOD if up else BAD)
@@ -638,6 +663,8 @@ class TUI(App):
             self.action_models()
         elif cmd == "/sidebar":
             self.action_sidebar()
+        elif cmd == "/theme":
+            self.command_theme(arg.strip().lower())
         elif cmd == "/private":
             if not self.private and not os.environ.get("BIFROST_PRIVATE_VK"):
                 self.say(Static("private mode needs BIFROST_PRIVATE_VK. Set it in /settings."), "note fail")
@@ -652,6 +679,26 @@ class TUI(App):
         else:
             self.say(Static("Unknown command. Type /help to see what is available."), "note")
         self.refresh_chrome()
+
+    def command_theme(self, name: str) -> None:
+        if name and name not in themes.PALETTES:
+            self.say(Static(f"unknown theme. Choose from: {', '.join(themes.PALETTES)}"), "note fail")
+        elif name:
+            self.set_theme(name)
+        else:
+            self.push_screen(ModelPicker(list(themes.PALETTES), PAL.name, "Select a theme"), lambda picked: picked and self.set_theme(picked))
+
+    def set_theme(self, name: str) -> None:
+        self.use_theme(name)
+        config.set_value("SLENDERTOKEN_THEME", name)
+        os.environ["SLENDERTOKEN_THEME"] = name
+        self.paint_terminal()
+        self.refresh_chrome()
+
+    def paint_terminal(self) -> None:
+        if tty := sys.__stdout__ if sys.__stdout__ and sys.__stdout__.isatty() else None:
+            tty.write(f"\x1b]11;{BG}\x1b\\")
+            tty.flush()
 
     def action_cycle_mode(self) -> None:
         self.mode = (self.mode + 1) % len(MODES)
@@ -678,7 +725,7 @@ class TUI(App):
     def action_models(self) -> None:
         """Pick the large model, then the first model. Opens from the cached list; Bifrost refreshes it behind."""
         if self.private:
-            self.say(Static(f"private mode runs {local_model()}. Change it with LEANTOKEN_LOCAL_MODEL."), "note")
+            self.say(Static(f"private mode runs {local_model()}. Change it with SLENDERTOKEN_LOCAL_MODEL."), "note")
             return
         if models := cached_models():
             self.pick_models(models)
@@ -799,7 +846,7 @@ class TUI(App):
             result = f"cannot reach Bifrost at {bifrost_url()}. Start it with: pnpm dlx @maximhq/bifrost"
         except Exception as e:  # still show what was spent
             result = f"error: {e}"
-        agent.fp.save(self.repo / ".leantoken" / "runs", result, agent.verified)
+        agent.fp.save(self.repo / ".slendertoken" / "runs", result, agent.verified)
         self.call_from_thread(self.finish, agent, result)
 
     def finish(self, agent: Agent, result: str) -> None:
@@ -831,9 +878,7 @@ class TUI(App):
         # outside the grid Textual can paint. OSC 11 sets the terminal's default background to match the
         # app so that margin blends in; OSC 111 restores the user's colour on exit.
         tty = sys.__stdout__ if sys.__stdout__ and sys.__stdout__.isatty() else None
-        if tty:
-            tty.write("\x1b]11;#0a0a0a\x1b\\")
-            tty.flush()
+        self.paint_terminal()
         try:
             self.run()
         finally:

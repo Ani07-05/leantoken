@@ -13,7 +13,7 @@ HERE = Path(__file__).parent
 OUT = HERE / "token-efficiency.svg"
 
 W, H = 1000, 870
-LEAN = "#10b981"      # emerald: leantoken
+LEAN = "#10b981"      # emerald: slendertoken
 NAIVE = "#94a3b8"     # slate: naive agent
 FAIL = "#f87171"      # red: request rejected (413)
 INK = "#111827"
@@ -70,7 +70,7 @@ def grouped_bars(x0, x1, y_base, y_top, values, vmax, colors, fail=None):
     for i, (lean, naive) in enumerate(values):
         cx = x0 + slot * (i + 0.5)
         centers.append(cx)
-        # leantoken bar (left)
+        # slendertoken bar (left)
         lh = (y_base - y_top) * (lean / vmax)
         lx = cx - gap / 2 - bw
         out.append(rect(lx, y_base - lh, bw, lh, colors[0], rx=4))
@@ -123,8 +123,8 @@ def main() -> None:
     font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
            f'width="{W}" height="{H}" font-family="{font}" '
-           f'role="img" aria-label="leantoken token efficiency versus a naive agent">',
-           '<title>leantoken vs naive agent: tokens per task</title>',
+           f'role="img" aria-label="slendertoken token efficiency versus a naive agent">',
+           '<title>slendertoken vs naive agent: tokens per task</title>',
            f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="{CARD}" stroke="{BORDER}"/>']
 
     svg.append(text(40, 52, "Token efficiency vs a naive agent", 24, INK, weight="700"))
@@ -133,7 +133,7 @@ def main() -> None:
     # legend (top right, clear of the subtitle)
     lx = 742
     svg.append(rect(lx, 44, 12, 12, LEAN, rx=3))
-    svg.append(text(lx + 20, 55, "leantoken", 13, INK))
+    svg.append(text(lx + 20, 55, "slendertoken", 13, INK))
     svg.append(rect(lx + 112, 44, 12, 12, NAIVE, rx=3))
     svg.append(text(lx + 132, 55, "naive", 13, INK))
 

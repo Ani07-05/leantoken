@@ -82,7 +82,7 @@ class Agent:
         else:
             self.large = groq_model(model)
             self.model = groq_model(small) if small else self.large
-            configured = [m.strip() for m in os.environ.get("LEANTOKEN_FALLBACKS", "").split(",") if m.strip()]
+            configured = [m.strip() for m in os.environ.get("SLENDERTOKEN_FALLBACKS", "").split(",") if m.strip()]
             self.fallbacks = configured or list(GROQ_CHAIN)
         self.fp = Footprint("")
         self.memory = memory  # what this agent sends about earlier turns

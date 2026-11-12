@@ -1,4 +1,4 @@
-"""Settings: real env > ./.env > ~/.leantoken/.env, so the exe works from any folder."""
+"""Settings: real env > ./.env > ~/.slendertoken/.env, so the exe works from any folder."""
 
 import os
 import subprocess
@@ -7,11 +7,11 @@ from pathlib import Path
 
 # snapshot before any .env is loaded, so `config list` can tell sources apart
 REAL_ENV = dict(os.environ)
-GLOBAL_ENV = Path.home() / ".leantoken" / ".env"
+GLOBAL_ENV = Path.home() / ".slendertoken" / ".env"
 SECRET = ("KEY", "VK", "TOKEN", "PASSWORD")
 TEMPLATE = """\
-# leantoken settings, used from any folder. A .env in the current folder overrides these.
-# Edit with `leantoken config edit` or `leantoken config set KEY VALUE`.
+# slendertoken settings, used from any folder. A .env in the current folder overrides these.
+# Edit with `slendertoken config edit` or `slendertoken config set KEY VALUE`.
 
 # Bifrost gateway: every model call goes through it
 BIFROST_URL=http://localhost:8080
@@ -19,22 +19,24 @@ BIFROST_URL=http://localhost:8080
 BIFROST_VK=
 # Ollama-only virtual key for --private runs
 BIFROST_PRIVATE_VK=
-# optional: skip the picker; otherwise run `leantoken --pick-model`
-# LEANTOKEN_MODEL=groq/openai/gpt-oss-120b
+# optional: skip the picker; otherwise run `slendertoken --pick-model`
+# SLENDERTOKEN_MODEL=groq/openai/gpt-oss-120b
 # optional: small model tried first (default groq/openai/gpt-oss-20b)
-# LEANTOKEN_SMALL_MODEL=groq/openai/gpt-oss-20b
+# SLENDERTOKEN_SMALL_MODEL=groq/openai/gpt-oss-20b
 # optional: grid intensity in gCO2e/kWh instead of the Groq-region default
-# LEANTOKEN_GRID_G=369
+# SLENDERTOKEN_GRID_G=369
 # optional: provider/model list Bifrost tries if Groq fails
-# LEANTOKEN_FALLBACKS=openai/gpt-4o-mini
+# SLENDERTOKEN_FALLBACKS=openai/gpt-4o-mini
 # optional: local model for --private (served by Ollama through Bifrost)
-# LEANTOKEN_LOCAL_MODEL=qwen2.5-coder:7b
+# SLENDERTOKEN_LOCAL_MODEL=qwen2.5-coder:7b
 # optional: backup budget price in USD per 1M tokens "in,out"
-# LEANTOKEN_PRICE=0.59,0.79
+# SLENDERTOKEN_PRICE=0.59,0.79
 # optional: enables the web_search tool (app.tavily.com); never used in private mode
 # TAVILY_API_KEY=tvly-
+# optional: color theme: slender, ember, nord, gruvbox, dracula or paper; change with /theme
+# SLENDERTOKEN_THEME=lean
 """
-USAGE = """usage: leantoken config [list | get KEY | set KEY VALUE | unset KEY | edit | path]
+USAGE = """usage: slendertoken config [list | get KEY | set KEY VALUE | unset KEY | edit | path]
   list            show settings in effect and where each comes from (secrets masked)
   get KEY         print one value
   set KEY VALUE   save to the global file

@@ -1,7 +1,7 @@
 __pycache__/
 *.egg-info/
 .venv/
-.leantoken/
+.slendertoken/
 .env
 UNDERSTANDING.md
 *.pdf
@@ -9,3 +9,4 @@ UNDERSTANDING.md
 bifrost/data/
 build/
 dist/
+bin/

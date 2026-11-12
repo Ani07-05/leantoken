@@ -9,7 +9,7 @@ MAX_OUT = 1600
 MAX_LINES = 150  # per read_file call; every later turn pays for what is read now
 SHELL = "Windows cmd.exe" if os.name == "nt" else "POSIX sh"
 SAFE_CMD = re.compile(r"^(git (status|diff|log|show|branch|ls-files)|ls|dir|pwd|cat|type|head|tail|wc)\b[^;&|><`$]*$")
-SKIP_DIRS = {".git", ".leantoken", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".mypy_cache", ".pytest_cache"}
+SKIP_DIRS = {".git", ".slendertoken", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".mypy_cache", ".pytest_cache"}
 MAX_FILES = 200
 
 
@@ -56,9 +56,9 @@ class Workspace:
         target = str(self._path(path))
         if shutil.which("rg"):
             cmd = ["rg", "-n", "--no-heading", "--no-messages", "--sort", "path", "-m", "5", "--max-columns", "200", "--max-columns-preview",
-                   "-g", "!.leantoken", pattern, target]
+                   "-g", "!.slendertoken", pattern, target]
         elif shutil.which("grep") and os.name != "nt":
-            cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.leantoken", pattern, target]
+            cmd = ["grep", "-rnI", "-m", "5", "--exclude-dir=.git", "--exclude-dir=.slendertoken", pattern, target]
         else:
             out = self._py_search(pattern, Path(target))
             self.naive = len(out)

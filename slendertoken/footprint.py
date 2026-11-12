@@ -21,7 +21,7 @@ A, B_EXP, C = 1.1665273170451914e-06, -0.011205921025579175, 4.052928146734005e-
 BATCH = 64
 SERVER_KW, GPUS_PER_SERVER, GPU_GB = 1.2, 8, 80
 PUE = 1.2  # Groq not listed by EcoLogits; OpenAI's US value used
-# gCO2e/kWh, Our World in Data 2023 (carbon intensity of electricity); override with LEANTOKEN_GRID_G
+# gCO2e/kWh, Our World in Data 2023 (carbon intensity of electricity); override with SLENDERTOKEN_GRID_G
 GRID_G_PER_KWH = {"IN": 713, "US": 369}
 DEFAULT_GRID = "US"
 # Groq data-center region (X-Groq-Region response header) -> grid
@@ -57,7 +57,7 @@ def energy_kwh(model: str, out_tokens: int, latency_s: float) -> float:
 
 
 def grid(region: str = "") -> float:
-    if override := os.environ.get("LEANTOKEN_GRID_G"):
+    if override := os.environ.get("SLENDERTOKEN_GRID_G"):
         return float(override)
     return GRID_G_PER_KWH[REGION_GRID.get(region, DEFAULT_GRID)]
 

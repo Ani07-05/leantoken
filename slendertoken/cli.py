@@ -25,18 +25,18 @@ def main() -> None:
     if sys.argv[1:2] == ["config"]:
         config.main(sys.argv[2:])
         return
-    ap = argparse.ArgumentParser(prog="leantoken", epilog="settings: leantoken config [list|set|unset|edit|path]")
+    ap = argparse.ArgumentParser(prog="slendertoken", epilog="settings: slendertoken config [list|set|unset|edit|path]")
     ap.add_argument("task", nargs="?")
     ap.add_argument("--repo", default=".")
-    ap.add_argument("--model", help="large Groq model via Bifrost (default: LEANTOKEN_MODEL or your saved pick)")
-    ap.add_argument("--small", help=f"first model, tried before the large one (default: LEANTOKEN_SMALL_MODEL, your saved pick or {DEFAULT_SMALL})")
+    ap.add_argument("--model", help="large Groq model via Bifrost (default: SLENDERTOKEN_MODEL or your saved pick)")
+    ap.add_argument("--small", help=f"first model, tried before the large one (default: SLENDERTOKEN_SMALL_MODEL, your saved pick or {DEFAULT_SMALL})")
     ap.add_argument("--no-route", action="store_true", help="use only the large model")
     ap.add_argument("--pick-model", action="store_true", help="pick the large and first models and save them")
     ap.add_argument("--budget", type=float, default=0.50, help="USD limit, persisted across runs")
     ap.add_argument("--private", action="store_true", help="local model only, nothing leaves the machine")
     a = ap.parse_args()
     if a.task and not os.environ.get("BIFROST_VK") and not a.private:
-        print(f"note: BIFROST_VK is not set. Run `leantoken config set BIFROST_VK <key>` ({config.GLOBAL_ENV})")
+        print(f"note: BIFROST_VK is not set. Run `slendertoken config set BIFROST_VK <key>` ({config.GLOBAL_ENV})")
     if a.pick_model:
         pick_model()
         if not a.task:
@@ -45,14 +45,14 @@ def main() -> None:
         ap.error("task is required when stdin is not a terminal")
 
     repo = Path(a.repo).resolve()
-    private = a.private or (repo / ".leantoken-private").exists()
+    private = a.private or (repo / ".slendertoken-private").exists()
     # the TUI opens settings and the model picker itself, so don't block on them here
     if private:
         model = small = ""
     else:
-        model = resolve_model(a.model) if a.task else (a.model or os.environ.get("LEANTOKEN_MODEL") or saved_model() or "")
+        model = resolve_model(a.model) if a.task else (a.model or os.environ.get("SLENDERTOKEN_MODEL") or saved_model() or "")
         small = "" if a.no_route else resolve_small(a.small)
-    budget = Budget(repo / ".leantoken" / "budget.json", a.budget)
+    budget = Budget(repo / ".slendertoken" / "budget.json", a.budget)
     if not a.task:
         TUI(repo, budget, private, model, small).loop()
         return
@@ -65,5 +65,5 @@ def main() -> None:
         result = f"error: {e}"
     print(result)
     print(agent.fp.report(result, agent.verified))
-    path = agent.fp.save(repo / ".leantoken" / "runs", result, agent.verified)
+    path = agent.fp.save(repo / ".slendertoken" / "runs", result, agent.verified)
     print(f"saved {path}  (budget spent ${agent.budget.spent:.4f} of ${a.budget:.2f})")

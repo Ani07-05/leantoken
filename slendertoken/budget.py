@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Local backup to the Bifrost virtual-key budget, which is the real limit.
 # Groq USD per 1M tokens (input, output), console.groq.com/docs/models, Nov 2026.
-# Unpublished prices get DEFAULT_PRICE so the limit still binds; override with LEANTOKEN_PRICE="in,out".
+# Unpublished prices get DEFAULT_PRICE so the limit still binds; override with SLENDERTOKEN_PRICE="in,out".
 PRICES = {
     "openai/gpt-oss-120b": (0.15, 0.60),
     "openai/gpt-oss-20b": (0.075, 0.30),
@@ -14,7 +14,7 @@ DEFAULT_PRICE = (1.00, 4.00)
 
 
 def price(model: str) -> tuple[float, float]:
-    if override := os.environ.get("LEANTOKEN_PRICE"):
+    if override := os.environ.get("SLENDERTOKEN_PRICE"):
         pin, pout = (float(x) for x in override.split(","))
         return pin, pout
     return PRICES.get(model.removeprefix("groq/"), DEFAULT_PRICE)
