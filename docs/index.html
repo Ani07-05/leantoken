@@ -6,9 +6,6 @@
 <title>slendertoken: a coding agent for the fewest tokens</title>
 <meta name="description" content="A coding agent for your terminal that finishes the job on the fewest tokens, then shows what the task cost in money, energy and carbon.">
 <link rel="icon" type="image/png" href="assets/animals/think.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
 <style>
 :root {
   --chalk: #f4f4f2;
@@ -24,9 +21,10 @@
   --del: #ff6b6b;
   --del-band: #35171a;
 
-  --display: "Anybody", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --text: "Geist", "Helvetica Neue", Arial, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* the same system stack and weights as the rehub site: native, quiet, nothing to download */
+  --display: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --text: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --gutter: clamp(1rem, 4vw, 3rem);
 }
 
@@ -51,7 +49,7 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* header */
 .bar { display: flex; align-items: center; justify-content: space-between; padding-block: 1.25rem; }
-.bar-mark { font-family: var(--display); font-weight: 800; font-stretch: 60%; font-size: 1.5rem; letter-spacing: -.01em; text-decoration: none; }
+.bar-mark { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -.03em; text-decoration: none; }
 .bar nav { display: flex; gap: 1.75rem; font-size: 1rem; }
 .bar nav a { text-decoration: none; }
 .bar nav a:hover { text-decoration: underline; }
@@ -61,14 +59,13 @@ a:hover { text-decoration-thickness: 2px; }
 .wordmark {
   margin: 0;
   font-family: var(--display);
-  font-weight: 760;
-  font-stretch: 50%;
-  font-size: clamp(3.5rem, 20vw, 18rem);
-  line-height: .8;
-  letter-spacing: .012em;
+  font-weight: 700;
+  font-size: clamp(2.75rem, 17vw, 15rem);
+  line-height: .9;
+  letter-spacing: -.045em;
   /* the word is the headline; keep it on one line at every width */
   white-space: nowrap;
-  margin-left: -.04em;
+  margin-left: -.05em;
 }
 .lede { max-width: 38rem; margin: clamp(1.5rem, 3vw, 2.5rem) 0 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); line-height: 1.45; font-weight: 400; }
 .lede strong { font-weight: 600; }
@@ -140,8 +137,8 @@ a:hover { text-decoration-thickness: 2px; }
 /* sections */
 section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .h2 {
-  margin: 0; font-family: var(--display); font-weight: 750; font-stretch: 72%;
-  font-size: clamp(2.5rem, 7vw, 5.5rem); line-height: .95; letter-spacing: -.015em; max-width: 16ch;
+  margin: 0; font-family: var(--display); font-weight: 650;
+  font-size: clamp(2rem, 4.6vw, 3.25rem); line-height: 1.1; letter-spacing: -.025em; max-width: 20ch; text-wrap: balance;
 }
 .prose { max-width: 38rem; margin: 1.5rem 0 0; }
 .prose p { margin: 0 0 1rem; }
@@ -168,7 +165,7 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .fill { height: .95rem; border-radius: 2px; flex: none; }
 .fill.naive { background: #b9b9b3; }
 .fill.slender { background: var(--ink); }
-.task-pct { font-family: var(--display); font-stretch: 70%; font-weight: 750; font-size: 1.75rem; text-align: right; line-height: 1; }
+.task-pct { font-family: var(--display); font-weight: 650; font-size: 1.5rem; letter-spacing: -.02em; text-align: right; line-height: 1; }
 .total { font-weight: 700; }
 .fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
 .session { margin-top: 3rem; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--ink); }
@@ -182,7 +179,7 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .steps { margin: 2rem 0 0; padding: 0; list-style: none; counter-reset: step; }
 .steps li { counter-increment: step; display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--rule); }
 .steps li:last-child { border-bottom: 1px solid var(--rule); }
-.steps li::before { content: counter(step); font-family: var(--display); font-stretch: 70%; font-weight: 750; font-size: 2rem; line-height: 1; }
+.steps li::before { content: counter(step); font-family: var(--display); font-weight: 650; font-size: 1.5rem; line-height: 1.2; }
 .steps h3 { margin: 0 0 .25rem; font-size: 1.125rem; font-weight: 600; }
 .steps p { margin: 0; max-width: 34rem; color: #2c2c2a; }
 
@@ -197,7 +194,7 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); padding-block: 2rem 3rem; }
 .foot { display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap; font-size: 1rem; }
 .foot p { margin: 0; max-width: 34rem; color: var(--graphite); }
-.foot-mark { font-family: var(--display); font-weight: 800; font-stretch: 60%; font-size: 1.5rem; color: var(--ink); margin-bottom: .35rem; display: block; }
+.foot-mark { font-family: var(--display); font-weight: 700; letter-spacing: -.03em; font-size: 1.25rem; color: var(--ink); margin-bottom: .35rem; display: block; }
 
 @media (max-width: 62rem) {
   .cols { grid-template-columns: 1fr; }
