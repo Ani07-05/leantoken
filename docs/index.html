@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>slendertoken</title>
+<meta name="description" content="A coding agent for your terminal that finishes the job on the fewest tokens, then shows what the task cost in money, energy and carbon.">
+<link rel="icon" type="image/png" href="assets/animals/think.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --chalk: #f4f4f2;
+  --ink: #0a0a0a;
+  --graphite: #62625e;
+  --rule: #d6d6d1;
+  --screen: #0a0a0a;
+  --screen-text: #ededed;
+  --screen-dim: #8f8f8f;
+  --screen-faint: #5c5c5c;
+  --add: #5fd787;
+  --add-band: #12301d;
+  --del: #ff6b6b;
+  --del-band: #35171a;
+
+  --display: "Anybody", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --text: "Geist", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --gutter: clamp(1rem, 4vw, 3rem);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--chalk);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.wrap { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: var(--gutter); }
+.skip { position: absolute; left: -999px; top: 0; background: var(--ink); color: var(--chalk); padding: .75rem 1rem; z-index: 10; }
+.skip:focus { left: 0; }
+
+/* header */
+.bar { display: flex; align-items: center; justify-content: space-between; padding-block: 1.25rem; }
+.bar-mark { font-family: var(--display); font-weight: 800; font-stretch: 60%; font-size: 1.5rem; letter-spacing: -.01em; text-decoration: none; }
+.bar nav { display: flex; gap: 1.75rem; font-size: 1rem; }
+.bar nav a { text-decoration: none; }
+.bar nav a:hover { text-decoration: underline; }
+
+/* hero */
+.hero { padding-top: clamp(1.5rem, 5vw, 4rem); }
+.wordmark {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-stretch: 50%;
+  font-size: clamp(3.5rem, 21vw, 19rem);
+  line-height: .8;
+  letter-spacing: -.012em;
+  /* the word is the headline; keep it on one line at every width */
+  white-space: nowrap;
+  margin-left: -.04em;
+}
+.lede { max-width: 38rem; margin: clamp(1.5rem, 3vw, 2.5rem) 0 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); line-height: 1.45; font-weight: 400; }
+.lede strong { font-weight: 600; }
+
+/* install */
+.install { margin-top: 2rem; max-width: 64rem; }
+.tabs { display: flex; gap: .25rem; margin-bottom: -1px; position: relative; z-index: 1; }
+.tab {
+  font: inherit; font-size: .9375rem; font-weight: 500;
+  padding: .55rem 1rem; border: 1px solid var(--rule); border-bottom: 0;
+  background: transparent; color: var(--graphite); cursor: pointer; border-radius: .5rem .5rem 0 0;
+}
+.tab[aria-selected="true"] { background: var(--ink); color: var(--screen-text); border-color: var(--ink); }
+.cmd {
+  display: flex; align-items: stretch; background: var(--ink); color: var(--screen-text);
+  border: 1px solid var(--ink); border-radius: 0 .5rem .5rem .5rem;
+}
+.cmd pre { margin: 0; padding: 1.1rem 1.25rem; font-family: var(--mono); font-size: .9375rem; line-height: 1.5; overflow-x: auto; flex: 1; white-space: pre; }
+.cmd pre[hidden] { display: none; }
+.copy {
+  font: inherit; font-size: .9375rem; font-weight: 500; cursor: pointer;
+  padding: 0 1.25rem; border: 0; border-left: 1px solid #2a2a2a; background: transparent; color: var(--screen-text);
+  border-radius: 0 .5rem .5rem 0; min-width: 6.5rem;
+}
+.copy:hover { background: #1d1d1d; }
+.install-note { margin: .9rem 0 0; font-size: 1rem; color: var(--graphite); max-width: 46rem; }
+.install-note code, .prose code, .steps code { font-family: var(--mono); font-size: .875em; background: #e7e7e3; padding: .1em .35em; border-radius: .25rem; }
+
+/* terminal demo */
+.demo { margin-top: clamp(2.5rem, 6vw, 4.5rem); }
+.screen {
+  background: var(--screen); color: var(--screen-text); border-radius: .75rem;
+  display: grid; grid-template-columns: minmax(0, 1fr) 15.5rem; overflow: hidden;
+  font-family: var(--mono); font-size: .8125rem; line-height: 1.55;
+}
+.screen-main { padding: 1.25rem 1.5rem 1.5rem; min-height: 25rem; overflow-x: auto; }
+.screen-side { padding: 1.25rem 1.25rem; border-left: 1px solid #2a2a2a; color: var(--screen-dim); }
+.screen-side h3 { margin: 0 0 .75rem; font: inherit; font-weight: 600; color: var(--screen-text); }
+.stat { display: flex; justify-content: space-between; gap: 1rem; margin: 0; padding: .15rem 0; }
+.stat dt { color: var(--screen-dim); }
+.stat dd { margin: 0; color: var(--screen-text); font-variant-numeric: tabular-nums; }
+.stat dd.good { color: var(--add); }
+.t-line { white-space: pre; display: block; min-height: 1.55em; }
+.js .t-line[data-step] { visibility: hidden; }
+.js .t-line.on { visibility: visible; }
+.t-user::before { content: "▌ "; color: var(--screen-text); }
+.t-user { font-weight: 600; }
+.t-tool { color: var(--screen-text); }
+.t-tool b { font-weight: 600; }
+.t-tool span { color: var(--screen-dim); }
+.t-res { color: var(--screen-dim); }
+.t-diff { display: block; white-space: pre; padding-left: 1ch; margin-left: 4ch; }
+.t-diff.ctx { color: var(--screen-dim); }
+.t-diff.add { background: var(--add-band); color: var(--screen-text); }
+.t-diff.del { background: var(--del-band); color: var(--screen-text); }
+.t-answer { margin-top: .75rem; padding-left: 2ch; }
+.t-done { color: var(--screen-dim); padding-left: 2ch; }
+.t-done .good { color: var(--add); }
+.t-done .plus { color: var(--add); }
+.t-done .minus { color: var(--del); }
+.t-work { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; min-height: 2.5rem; }
+.t-work img { width: 5rem; height: auto; image-rendering: pixelated; }
+.t-work p { margin: 0; color: var(--screen-dim); }
+.t-work p b { color: var(--screen-text); font-weight: 600; }
+.caret { display: inline-block; width: .6ch; height: 1.1em; background: var(--screen-text); vertical-align: text-bottom; margin-left: 1px; }
+.demo-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-top: .9rem; font-size: .9375rem; color: var(--graphite); }
+.link-btn { white-space: nowrap; font: inherit; background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: .25em; cursor: pointer; }
+
+/* sections */
+section { padding-top: clamp(4.5rem, 10vw, 8rem); }
+.h2 {
+  margin: 0; font-family: var(--display); font-weight: 750; font-stretch: 72%;
+  font-size: clamp(2.5rem, 7vw, 5.5rem); line-height: .95; letter-spacing: -.015em; max-width: 16ch;
+}
+.prose { max-width: 38rem; margin: 1.5rem 0 0; }
+.prose p { margin: 0 0 1rem; }
+.cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(2rem, 6vw, 5rem); align-items: start; }
+.cols > .h2 { position: sticky; top: 2rem; }
+
+.rows { margin: 2rem 0 0; padding: 0; list-style: none; }
+.rows li { display: grid; grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); gap: 1.5rem; padding: 1.1rem 0; border-top: 1px solid var(--rule); }
+.rows li:last-child { border-bottom: 1px solid var(--rule); }
+.rows h3 { margin: 0; font-size: 1.125rem; font-weight: 600; line-height: 1.4; }
+.rows p { margin: 0; color: #2c2c2a; max-width: 34rem; }
+
+/* benchmark */
+.bench { margin-top: 2.5rem; }
+.bench-key { display: flex; gap: 1.5rem; font-size: .9375rem; color: var(--graphite); margin-bottom: 1rem; }
+.sw { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .5rem; vertical-align: -.05rem; }
+.sw.naive { background: #b9b9b3; }
+.sw.slender { background: var(--ink); }
+.task { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 4.5rem; gap: 1rem; align-items: center; padding: .85rem 0; border-top: 1px solid var(--rule); }
+.task:last-of-type { border-bottom: 1px solid var(--rule); }
+.task-name { font-weight: 600; }
+.bars { display: grid; gap: .35rem; }
+.bar-row { display: flex; align-items: center; gap: .6rem; font-family: var(--mono); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.fill { height: .95rem; border-radius: 2px; flex: none; }
+.fill.naive { background: #b9b9b3; }
+.fill.slender { background: var(--ink); }
+.task-pct { font-family: var(--display); font-stretch: 70%; font-weight: 750; font-size: 1.75rem; text-align: right; line-height: 1; }
+.total { font-weight: 700; }
+.fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
+.session { margin-top: 3rem; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--ink); }
+.session > div { padding: 1.1rem 1rem 0 0; }
+.session h3 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; }
+.session .n { font-family: var(--mono); font-size: 1rem; font-variant-numeric: tabular-nums; margin: 0; }
+.session .n.dim { color: var(--graphite); }
+.session .n.stop { color: var(--ink); font-weight: 600; }
+
+/* setup steps */
+.steps { margin: 2rem 0 0; padding: 0; list-style: none; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--rule); }
+.steps li:last-child { border-bottom: 1px solid var(--rule); }
+.steps li::before { content: counter(step); font-family: var(--display); font-stretch: 70%; font-weight: 750; font-size: 2rem; line-height: 1; }
+.steps h3 { margin: 0 0 .25rem; font-size: 1.125rem; font-weight: 600; }
+.steps p { margin: 0; max-width: 34rem; color: #2c2c2a; }
+
+/* animals */
+.zoo { margin: 2.5rem 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
+.zoo li { background: var(--screen); border-radius: .75rem; padding: 1.25rem .75rem 1rem; text-align: center; color: var(--screen-text); }
+.zoo img { width: 100%; max-width: 8.5rem; height: auto; image-rendering: pixelated; display: block; margin: 0 auto .75rem; }
+.zoo b { display: block; font-weight: 600; font-size: .9375rem; }
+.zoo span { font-size: .875rem; color: var(--screen-dim); }
+
+/* footer */
+footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); padding-block: 2rem 3rem; }
+.foot { display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap; font-size: 1rem; }
+.foot p { margin: 0; max-width: 34rem; color: var(--graphite); }
+.foot-mark { font-family: var(--display); font-weight: 800; font-stretch: 60%; font-size: 1.5rem; color: var(--ink); margin-bottom: .35rem; display: block; }
+
+@media (max-width: 62rem) {
+  .cols { grid-template-columns: 1fr; }
+  .cols > .h2 { position: static; }
+  .zoo { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 48rem) {
+  .screen { grid-template-columns: 1fr; }
+  .screen-side { border-left: 0; border-top: 1px solid #2a2a2a; }
+  .rows li { grid-template-columns: 1fr; gap: .35rem; }
+  .task { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .task-name { grid-column: 1 / -1; }
+  .session { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .session > div { padding-bottom: 1.25rem; }
+  .bar nav { gap: 1.25rem; }
+}
+@media (max-width: 30rem) {
+  .zoo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .copy { min-width: 5rem; padding: 0 .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .caret { display: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap bar">
+  <a class="bar-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
+  <nav aria-label="Primary">
+    <a href="#install">Install</a>
+    <a href="#measured">Benchmark</a>
+    <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+  <div class="wrap hero" id="top">
+    <h1 class="wordmark">slendertoken</h1>
+    <p class="lede">A coding agent for your terminal. It finishes the job on <strong>the fewest tokens</strong>, then shows what the task cost in money, energy and carbon.</p>
+
+    <div class="install" id="install">
+      <div class="tabs" role="tablist" aria-label="Operating system">
+        <button class="tab" role="tab" id="tab-unix" aria-selected="true" aria-controls="cmd-unix" type="button">macOS and Linux</button>
+        <button class="tab" role="tab" id="tab-win" aria-selected="false" aria-controls="cmd-win" type="button" tabindex="-1">Windows</button>
+      </div>
+      <div class="cmd">
+        <pre id="cmd-unix" role="tabpanel" aria-labelledby="tab-unix"><code>curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.sh | sh</code></pre>
+        <pre id="cmd-win" role="tabpanel" aria-labelledby="tab-win" hidden><code>irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex</code></pre>
+        <button class="copy" type="button" id="copy">Copy</button>
+      </div>
+      <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for your free Groq key. Then run <code>slendertoken</code> in any repo.</p>
+    </div>
+
+    <div class="demo" aria-label="Sample session">
+      <div class="screen" id="screen" role="img" aria-label="A sample slendertoken session: the agent fixes a failing discount test, shows the diff, and reports 59 percent fewer tokens than a naive agent.">
+        <div class="screen-main" aria-hidden="true">
+          <span class="t-line t-user" data-step="0"><span id="typed">fix the failing discount test</span><span class="caret" id="caret"></span></span>
+          <span class="t-line t-tool" data-step="1"><b>▸ Search</b>  <span>def apply_discount</span></span>
+          <span class="t-line t-res" data-step="1">    ↳ shop/pricing.py:12:def apply_discount(total, pct):</span>
+          <span class="t-line t-tool" data-step="2"><b>▸ Read</b>  <span>shop/pricing.py:10-24</span></span>
+          <span class="t-line t-res" data-step="2">    ↳ [31 lines total]</span>
+          <span class="t-line t-tool" data-step="3"><b>▸ Edit</b>  <span>shop/pricing.py</span></span>
+          <span class="t-line t-res" data-step="3">    ↳ edited shop/pricing.py  <span class="plus" style="color:var(--add)">+1</span> <span class="minus" style="color:var(--del)">-1</span></span>
+          <span class="t-line t-diff ctx" data-step="3">    11   </span>
+          <span class="t-line t-diff ctx" data-step="3">    12   def apply_discount(total, pct):</span>
+          <span class="t-line t-diff del" data-step="3">    13 -     return total - pct</span>
+          <span class="t-line t-diff add" data-step="3">    13 +     return total * (1 - pct / 100)</span>
+          <span class="t-line t-diff ctx" data-step="3">    14   </span>
+          <span class="t-line t-tool" data-step="4"><b>▸ Bash</b>  <span>pytest -q</span></span>
+          <span class="t-line t-res" data-step="4">    ↳ 12 passed in 0.08s</span>
+          <span class="t-line t-answer" data-step="5">The discount was subtracting the percentage instead of applying it. Fixed in one line.</span>
+          <span class="t-line t-done" data-step="5">─ 2,880 tokens  ·  <span class="good">↓ 59% fewer than naive</span>  ·  $0.0004  ·  <span class="plus">+1</span> <span class="minus">-1</span></span>
+        </div>
+        <aside class="screen-side" aria-hidden="true">
+          <h3>Tokens</h3>
+          <dl style="margin:0">
+            <div class="stat"><dt>used</dt><dd id="s-used">0</dd></div>
+            <div class="stat"><dt>naive</dt><dd id="s-naive">0</dd></div>
+            <div class="stat"><dt>saved</dt><dd class="good" id="s-saved">-</dd></div>
+          </dl>
+          <h3 style="margin-top:1.25rem">Task</h3>
+          <dl style="margin:0">
+            <div class="stat"><dt>cost</dt><dd id="s-cost">$0.0000</dd></div>
+            <div class="stat"><dt>lines</dt><dd id="s-lines">-</dd></div>
+          </dl>
+          <div class="t-work" style="margin-top:1.5rem;flex-direction:column;align-items:flex-start;gap:.6rem">
+            <img id="critter" src="assets/animals/think.png" alt="" width="160" height="64">
+            <p id="verb"><b>Noodling…</b></p>
+          </div>
+        </aside>
+      </div>
+      <div class="demo-foot">
+        <span>A sample session, replayed. The task and figures are illustrative; the interface is the real one.</span>
+        <button class="link-btn" type="button" id="replay">Play it again</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap cols">
+      <h2 class="h2">Fewer tokens come from reading less.</h2>
+      <div>
+        <div class="prose">
+          <p>Most of an agent's bill is the file contents and tool output it carries from turn to turn. slendertoken is built around not carrying them.</p>
+        </div>
+        <ul class="rows">
+          <li><h3>Reads a range, not a file</h3><p>Files come in 100-line slices. Search stops at five hits per file. Tool output is clipped before the model sees it.</p></li>
+          <li><h3>Forgets old results</h3><p>Only the two most recent tool results stay in full. Older ones shrink to a stub, so they are not paid for again on every call.</p></li>
+          <li><h3>Starts small, escalates when stuck</h3><p>A small model works first. When a step fails, tests stay red or a tool call is rejected, the large model finishes the task.</p></li>
+          <li><h3>Edits by exact match</h3><p>An edit replaces one unique string and shows as a numbered diff. No rewriting whole files to change a line.</p></li>
+          <li><h3>Counts what it saved</h3><p>Every request is compared against a naive twin that reads whole files and resends the transcript. The gap shows live in the sidebar.</p></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="measured">
+    <div class="wrap">
+      <h2 class="h2">Measured against a naive agent.</h2>
+      <div class="prose">
+        <p>Same model, same four seeded bugs, same free-tier limits, every call through Bifrost. A task counts only if <code>pytest</code> is green afterwards. Both agents fixed 4 of 4.</p>
+      </div>
+
+      <div class="bench" role="group" aria-label="Tokens used per task, naive agent against slendertoken">
+        <div class="bench-key"><span><i class="sw naive"></i>Naive agent</span><span><i class="sw slender"></i>slendertoken</span></div>
+
+        <div class="task"><span class="task-name">discount</span>
+          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:82.0%"></span>25,641</div><div class="bar-row"><span class="fill slender" style="width:29.7%"></span>9,287</div></div>
+          <span class="task-pct">63%</span></div>
+        <div class="task"><span class="task-name">restock</span>
+          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:24.4%"></span>7,622</div><div class="bar-row"><span class="fill slender" style="width:13.7%"></span>4,276</div></div>
+          <span class="task-pct">43%</span></div>
+        <div class="task"><span class="task-name">cart</span>
+          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:26.6%"></span>8,309</div><div class="bar-row"><span class="fill slender" style="width:14.0%"></span>4,385</div></div>
+          <span class="task-pct">47%</span></div>
+        <div class="task"><span class="task-name">month</span>
+          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:28.4%"></span>8,860</div><div class="bar-row"><span class="fill slender" style="width:15.2%"></span>4,754</div></div>
+          <span class="task-pct">46%</span></div>
+        <div class="task total"><span class="task-name">All four</span>
+          <div class="bars"><div class="bar-row">Naive: 50,432 tokens, $0.0065</div><div class="bar-row">slendertoken: 22,702 tokens, $0.0030</div></div>
+          <span class="task-pct">54%</span></div>
+      </div>
+
+      <div class="session" role="group" aria-label="Cumulative tokens over a session of follow-up questions">
+        <div><h3>After question 1</h3><p class="n">968 tokens</p><p class="n dim">naive 3,480</p></div>
+        <div><h3>After question 3</h3><p class="n">4,724 tokens</p><p class="n dim">naive 12,654</p></div>
+        <div><h3>After question 5</h3><p class="n">9,394 tokens</p><p class="n dim">naive 28,810</p></div>
+        <div><h3>Question 6</h3><p class="n">12,710 tokens</p><p class="n stop">naive stopped: Groq refused a 19,450-token request</p></div>
+      </div>
+      <p class="fine">One run per agent, one model, one small synthetic project, free-tier rate limits. On a paid tier the naive agent would not have crashed, it would have cost more. Read the percentages as indicative, not general. Raw numbers and the script to reproduce them are in the repo.</p>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="wrap cols">
+      <h2 class="h2">One command sets up the rest.</h2>
+      <div>
+        <div class="prose">
+          <p>Every model call goes through Bifrost, a gateway that enforces your budget and retries on provider errors. The installer sets it up so you never open its dashboard.</p>
+        </div>
+        <ol class="steps">
+          <li><div><h3>Downloads slendertoken</h3><p>A single binary for your system, checked against a published SHA-256 before it is installed. No Python, Node or Go.</p></div></li>
+          <li><div><h3>Asks for your Groq key</h3><p>Input is hidden. The key goes into a private config file in <code>~/.slendertoken</code> on your machine and nowhere else. Free keys come from console.groq.com.</p></div></li>
+          <li><div><h3>Installs and starts Bifrost</h3><p>It picks a free port, writes the config with a daily budget on a virtual key, and starts the gateway in the background, bound to your machine only.</p></div></li>
+          <li><div><h3>Proves it works</h3><p>It sends one tiny request through the whole path. If Groq rejects the key, it says so and tells you how to fix it.</p></div></li>
+        </ol>
+        <div class="prose">
+          <p>After a reboot, <code>slendertoken</code> starts the gateway again by itself. <code>slendertoken bifrost status</code>, <code>stop</code> and <code>logs</code> manage it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust">
+    <div class="wrap cols">
+      <h2 class="h2">Built to be trusted with a repo.</h2>
+      <div>
+        <ul class="rows" style="margin-top:0">
+          <li><h3>Asks before it acts</h3><p>Edits and shell commands wait for your approval, shown as a diff. Switch to accept-edits or auto with shift+tab when you trust a task.</p></li>
+          <li><h3>A budget that binds</h3><p>A daily dollar limit on the virtual key, enforced by the gateway, plus a local backup limit per repo.</p></li>
+          <li><h3>Private mode</h3><p>Point it at a local Ollama model and nothing leaves your machine. Network commands in the shell are blocked too.</p></li>
+          <li><h3>Asks when unsure</h3><p>If a task is ambiguous, the agent asks you a multiple-choice question instead of guessing.</p></li>
+          <li><h3>Looks things up</h3><p>With a Tavily key it can search the web for current docs and shows the sources it used as links.</p></li>
+          <li><h3>Reports its own footprint</h3><p>Tokens, cost, latency, energy and carbon for every task, using the EcoLogits method. Energy and carbon are estimates, labeled as such.</p></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="company">
+    <div class="wrap">
+      <h2 class="h2">A small animal keeps you company.</h2>
+      <div class="prose">
+        <p>While it works, a pixel animal shows what the agent is doing, so a long task never looks frozen.</p>
+      </div>
+      <ul class="zoo" aria-label="The six animals">
+        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Bunny</b><span>thinking</span></li>
+        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Frog</b><span>editing files</span></li>
+        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Cat</b><span>searching</span></li>
+        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Owl</b><span>reading</span></li>
+        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Penguin</b><span>running commands</span></li>
+        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Octopus</b><span>browsing the web</span></li>
+      </ul>
+      <p class="fine">Drawn as real images in Ghostty and kitty, and as smaller block characters in other terminals.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <span class="foot-mark">slendertoken</span>
+      <p>Open source. Built for the Geek Room Global AI Hackathon: a coding agent that gets the job done on the fewest tokens.</p>
+    </div>
+    <p><a href="https://github.com/Ani07-05/slendertoken">Source and issues on GitHub</a><br><a href="https://github.com/Ani07-05/slendertoken#install">Install options</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  root.classList.add('js');
+
+  /* install tabs and copy */
+  var tabs = [document.getElementById('tab-unix'), document.getElementById('tab-win')];
+  var panels = [document.getElementById('cmd-unix'), document.getElementById('cmd-win')];
+  function select(i) {
+    tabs.forEach(function (t, j) { t.setAttribute('aria-selected', String(i === j)); t.tabIndex = i === j ? 0 : -1; });
+    panels.forEach(function (p, j) { p.hidden = i !== j; });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(i); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { var n = (i + 1) % 2; select(n); tabs[n].focus(); }
+    });
+  });
+  var copy = document.getElementById('copy');
+  copy.addEventListener('click', function () {
+    var p = panels.filter(function (x) { return !x.hidden; })[0];
+    var text = p.textContent.trim();
+    var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, fail); } else { fail(); }
+    function fail() {
+      var r = document.createRange(); r.selectNodeContents(p); var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      copy.textContent = 'Press Ctrl+C';
+    }
+  });
+
+  /* sample session */
+  var lines = Array.prototype.slice.call(document.querySelectorAll('.t-line[data-step]'));
+  var typed = document.getElementById('typed');
+  var caret = document.getElementById('caret');
+  var prompt = typed.textContent;
+  var els = {
+    used: document.getElementById('s-used'), naive: document.getElementById('s-naive'), saved: document.getElementById('s-saved'),
+    cost: document.getElementById('s-cost'), lines: document.getElementById('s-lines'),
+    critter: document.getElementById('critter'), verb: document.getElementById('verb')
+  };
+  /* numbers after each step: tokens used, tokens a naive agent would have used */
+  var stats = [
+    [0, 0, 'Noodling…', 'think'],
+    [620, 1500, 'Rummaging…', 'search'],
+    [1180, 2900, 'Reading…', 'read'],
+    [1890, 4600, 'Typing…', 'type'],
+    [2640, 6500, 'Running…', 'shell'],
+    [2880, 7080, 'Done', 'think']
+  ];
+  var timers = [];
+  function fmt(n) { return n.toLocaleString('en-US'); }
+  function apply(step) {
+    var s = stats[step];
+    els.used.textContent = fmt(s[0]);
+    els.naive.textContent = s[1] ? '~' + fmt(s[1]) : '0';
+    els.saved.textContent = s[1] ? '↓ ' + Math.round(100 * (s[1] - s[0]) / s[1]) + '%' : '-';
+    els.cost.textContent = '$' + (s[0] * 0.00000014).toFixed(4);
+    els.lines.textContent = step >= 3 ? '+1 -1' : '-';
+    els.verb.innerHTML = '<b>' + s[2] + '</b>';
+    els.critter.src = 'assets/animals/' + s[3] + '.png';
+  }
+  function showAll() {
+    lines.forEach(function (l) { l.classList.add('on'); });
+    typed.textContent = prompt; caret.style.display = 'none';
+    apply(5);
+  }
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    lines.forEach(function (l) { l.classList.remove('on'); });
+    typed.textContent = ''; caret.style.display = '';
+    apply(0);
+    lines[0].classList.add('on');
+    var t = 300;
+    for (var i = 1; i <= prompt.length; i++) {
+      (function (i) { timers.push(setTimeout(function () { typed.textContent = prompt.slice(0, i); }, t + i * 38)); })(i);
+    }
+    t += prompt.length * 38 + 500;
+    for (var step = 1; step <= 5; step++) {
+      (function (step) {
+        timers.push(setTimeout(function () {
+          lines.forEach(function (l) { if (+l.dataset.step === step) l.classList.add('on'); });
+          apply(step);
+          if (step === 5) caret.style.display = 'none';
+        }, t));
+      })(step);
+      t += step === 3 ? 1300 : 900;
+    }
+  }
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var started = false;
+  function start() { if (started) return; started = true; reduce ? showAll() : play(); }
+  var screen = document.getElementById('screen');
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (e, o) { if (e[0].isIntersecting) { start(); o.disconnect(); } }, { threshold: 0.35 }).observe(screen);
+  } else { start(); }
+  document.getElementById('replay').addEventListener('click', function () { started = true; reduce ? showAll() : play(); });
+  if (reduce) { showAll(); started = true; }
+})();
+</script>
+</body>
+</html>
