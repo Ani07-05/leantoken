@@ -227,6 +227,9 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .zoo b { display: block; font-weight: 600; font-size: .9375rem; }
 .zoo span { font-size: .875rem; color: var(--screen-dim); }
 
+/* the animals intro reads as one line on wide screens */
+#company .h2, #company .prose { max-width: none; }
+
 /* footer */
 footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); padding-block: 2rem 3rem; }
 .foot { display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap; font-size: 1rem; }
