@@ -46,11 +46,11 @@ irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | i
 That one command does everything:
 
 1. Downloads the single `slendertoken` binary for your system and checks its SHA-256 (no Python, Node or Go needed).
-2. Runs `slendertoken setup`, which asks for your own [Groq API key](https://console.groq.com/keys) (bring your own key, input hidden).
-3. Downloads [Bifrost](https://github.com/maximhq/bifrost), writes its config (Groq provider plus a virtual key with a daily budget), and starts it in the background on a free port.
+2. Runs `slendertoken setup`, which asks which provider you use and for your own API key (bring your own key, input hidden). Any provider Bifrost supports works: OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Mistral, DeepSeek, xAI, Cerebras, Fireworks, Perplexity, Cohere, Nebius, Parasail, Hugging Face and MiniMax.
+3. Downloads [Bifrost](https://github.com/maximhq/bifrost), writes its config (your provider plus a virtual key with a daily budget), and starts it as a headless background process, bound to `127.0.0.1`, on a free port.
 4. Saves the settings and sends one tiny request through the whole path to prove it works.
 
-Then run `slendertoken` in any repo. Set `GROQ_API_KEY` first to skip the prompt, or `SLENDERTOKEN_NO_SETUP=1` to install only. From source: `go build -o slendertoken ./cmd/slendertoken` (Go 1.22+).
+Then run `slendertoken` in any repo. Set your provider's key first (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, ...) to skip the prompt, or `SLENDERTOKEN_NO_SETUP=1` to install only. From source: `go build -o slendertoken ./cmd/slendertoken` (Go 1.22+).
 
 ## What it does
 
@@ -67,7 +67,7 @@ Then run `slendertoken` in any repo. Set `GROQ_API_KEY` first to skip the prompt
 ```mermaid
 flowchart LR
     CLI["slendertoken"] --> BF["Bifrost gateway<br/>virtual keys: budget, rate limit, providers"]
-    BF --> G["Groq (default)"]
+    BF --> G["Your provider (OpenAI, Anthropic, Gemini, Groq, ...)"]
     BF --> F["fallback provider"]
     BF --> O["Ollama (private repos only)"]
     CLI -. "docs lookup" .-> T["Tavily API"]
@@ -83,13 +83,15 @@ flowchart LR
 Use the one-line installer from [Quick start](#see-it-work), or download a binary from the GitHub releases page (macOS, Linux, Windows; arm64 and amd64) and run `slendertoken setup` yourself.
 
 ```
-slendertoken setup                 # download Bifrost, configure Groq + budget, start it, test it
+slendertoken setup                 # download Bifrost, pick a provider + budget, start it, test it
+slendertoken setup --provider openai   # skip the menu
 slendertoken setup --budget 5      # daily budget in USD on the virtual key (default 2)
-slendertoken setup --force         # redo it, for example with a new Groq key
+slendertoken setup --force         # redo it, for example with a new key
+slendertoken provider add anthropic    # add or replace a provider later (also: list, remove)
 slendertoken bifrost status        # also: start, stop, logs, path
 ```
 
-Everything lives in `~/.slendertoken`: the Bifrost binary and data in `bifrost/`, your settings in `.env`. The Groq key is stored only in Bifrost's private config file there (mode 600). If the gateway is not running, for example after a reboot, `slendertoken` starts it for you.
+Everything lives in `~/.slendertoken`: the Bifrost binary and data in `bifrost/`, your settings in `.env`. Your provider keys are stored only in Bifrost's private config file there (mode 600). If the gateway is not running, for example after a reboot, `slendertoken` starts it for you.
 
 Already run your own Bifrost? Skip `setup`: put its URL and virtual key in Settings (`ctrl+s`). For private repos, add Ollama and a second key that allows only Ollama in the Bifrost dashboard.
 
@@ -106,22 +108,22 @@ slendertoken                      # full-screen TUI: /help, !cmd, ctrl+b sidebar
 slendertoken "fix the failing test in tests/test_api.py" --repo path/to/repo
 slendertoken "add input validation to create_user" --budget 0.50
 slendertoken "rename Config to Settings" --private
-slendertoken "..." --model groq/openai/gpt-oss-120b --small groq/openai/gpt-oss-20b
+slendertoken "..." --model anthropic/claude-sonnet-5-5 --small anthropic/claude-haiku-4-5-20251001
 slendertoken "..." --no-route     # large model only
 ```
 
-The small model (`groq/openai/gpt-oss-20b` by default) runs first. slendertoken switches to the large model for the rest of the task when:
+The small model runs first (pick both with `ctrl+o`; Groq and Anthropic have built-in defaults). slendertoken switches to the large model for the rest of the task when:
 - the small model is not done after 8 steps
 - 2 tool calls in a row fail
 - tests fail twice after an edit
 - it says it is done while tests still fail
-- Groq rejects its tool call
+- the provider rejects its tool call
 
 Each run prints a footprint report and saves it, with a per-step trace, to `<repo>/.slendertoken/runs/`. The TUI also plots tokens saved per turn against a naive twin of each request (whole-file reads, unclipped output, full history); that figure is an estimate for one run, while the benchmark below is the measured comparison.
 
 ## Private mode
 
-For repos that must not leave your machine. Private mode runs one local Ollama model through Bifrost, with no Groq, no cloud fallback and no `web_search`. The private virtual key allows only Ollama, so Bifrost refuses any cloud call even if slendertoken asked for one.
+For repos that must not leave your machine. Private mode runs one local Ollama model through Bifrost, with no cloud provider, no cloud fallback and no `web_search`. The private virtual key allows only Ollama, so Bifrost refuses any cloud call even if slendertoken asked for one.
 
 ```
 ollama pull qwen2.5-coder:7b
@@ -132,7 +134,7 @@ touch <repo>/.slendertoken-private        # always private in this repo
 
 - Model: `qwen2.5-coder:7b` by default; change it with `SLENDERTOKEN_LOCAL_MODEL`.
 - Inside the TUI, `/private` toggles it (it refuses to switch on without `BIFROST_PRIVATE_VK`), and the footer and sidebar show the local model.
-- Private runs never ask for a Groq key or list Groq models, and cost $0.
+- Private runs never ask for a provider key or list cloud models, and cost $0.
 - Shell: the agent cannot run common network tools (`curl`, `wget`, `ssh`, `git push`/`fetch`/`clone`, `pip`/`npm install` and similar). This is a best-effort block, not a sandbox: a script can still open a socket, so use an OS-level sandbox if you need a hard guarantee. The model call itself is local by construction.
 - Footprint: energy and carbon show as n/a, because the EcoLogits estimate models cloud GPUs and says nothing about your machine. Token savings are still reported.
 
@@ -174,10 +176,10 @@ Energy uses the [EcoLogits](https://ecologits.ai/latest/methodology/llm_inferenc
 
 ## Tech
 
-Go, Bubble Tea, Lip Gloss, Glamour, Bifrost, Groq, Ollama, Tavily, EcoLogits. The benchmark in `bench/` still uses the original Python agent.
+Go, Bubble Tea, Lip Gloss, Glamour, Bifrost (OpenAI, Anthropic, Gemini, Groq, OpenRouter and 11 more providers), Ollama, Tavily, EcoLogits. The benchmark in `bench/` still uses the original Python agent.
 
 ## AI usage
 
-- Groq-hosted LLMs run the agent; Ollama models run it for private repos.
+- LLMs from the provider you choose run the agent (the benchmark below used Groq-hosted gpt-oss); Ollama models run it for private repos.
 - Tavily provides live documentation search.
 - Claude (Claude Code) helped write the code and documentation. The team reviewed it and is responsible for all of it.
