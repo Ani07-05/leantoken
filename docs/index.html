@@ -194,27 +194,12 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 
 /* benchmark */
 .bench { margin-top: 2.5rem; }
-.bench-key { display: flex; gap: 1.5rem; font-size: .9375rem; color: var(--graphite); margin-bottom: 1rem; }
-.sw { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .5rem; vertical-align: -.05rem; }
-.sw.naive { background: var(--naive); }
-.sw.slender { background: var(--bar-ink); }
-.task { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 4.5rem; gap: 1rem; align-items: center; padding: .85rem 0; border-top: 1px solid var(--rule); }
-.task:last-of-type { border-bottom: 1px solid var(--rule); }
-.task-name { font-weight: 600; }
 .bars { display: grid; gap: .35rem; }
 .bar-row { display: flex; align-items: center; gap: .6rem; font-family: var(--mono); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .fill { height: .95rem; border-radius: 2px; flex: none; }
 .fill.naive { background: var(--naive); }
 .fill.slender { background: var(--bar-ink); }
-.task-pct { font-family: var(--display); font-weight: 650; font-size: 1.5rem; letter-spacing: -.02em; text-align: right; line-height: 1; }
-.total { font-weight: 700; }
 .fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
-.session { margin-top: 3rem; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--ink); }
-.session > div { padding: 1.1rem 1rem 0 0; }
-.session h3 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; }
-.session .n { font-family: var(--mono); font-size: 1rem; font-variant-numeric: tabular-nums; margin: 0; }
-.session .n.dim { color: var(--graphite); }
-.session .n.stop { color: var(--ink); font-weight: 600; }
 
 
 /* comparison with other agents */
@@ -257,11 +242,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   .screen { grid-template-columns: 1fr; }
   .screen-side { border-left: 0; border-top: 1px solid #2a2a2a; }
   .rows li { grid-template-columns: 1fr; gap: .35rem; }
-  .task { grid-template-columns: minmax(0, 1fr) 4rem; }
   .ovh { grid-template-columns: 1fr; gap: .35rem; }
-  .task-name { grid-column: 1 / -1; }
-  .session { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .session > div { padding-bottom: 1.25rem; }
   .bar nav { gap: 1.25rem; }
 }
 @media (max-width: 30rem) {
@@ -281,7 +262,6 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   <a class="bar-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
   <nav aria-label="Primary">
     <a href="#install">Install</a>
-    <a href="#measured">Benchmark</a>
     <a href="#compare">Compare</a>
     <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
     <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme">Dark</button>
@@ -351,6 +331,24 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     </div>
   </div>
 
+  <section id="company">
+    <div class="wrap">
+      <h2 class="h2">See what it is doing at a glance.</h2>
+      <div class="prose">
+        <p>While a task runs, a small pixel animal sits above the prompt and changes with the agent&rsquo;s current step. You can tell reading from editing from running a command without scrolling the log.</p>
+      </div>
+      <ul class="zoo" aria-label="What each animal means">
+        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Thinking</b><span>Bunny, waiting on the model</span></li>
+        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Searching</b><span>Cat, searching and listing files</span></li>
+        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Reading</b><span>Owl, reading a file</span></li>
+        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Editing</b><span>Frog, changing or writing a file</span></li>
+        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Running</b><span>Penguin, running a command</span></li>
+        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Browsing</b><span>Octopus, searching the web</span></li>
+      </ul>
+      <p class="fine">Drawn as real images in Ghostty and kitty, and as smaller block characters in other terminals.</p>
+    </div>
+  </section>
+
   <section id="how">
     <div class="wrap cols">
       <h2 class="h2">Fewer tokens come from reading less.</h2>
@@ -366,43 +364,6 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
           <li><h3>Counts what it saved</h3><p>Every request is compared against a naive twin that reads whole files and resends the transcript. The gap shows live in the sidebar.</p></li>
         </ul>
       </div>
-    </div>
-  </section>
-
-  <section id="measured">
-    <div class="wrap">
-      <h2 class="h2">Measured against a naive agent.</h2>
-      <div class="prose">
-        <p>Same model, same four seeded bugs, same free-tier limits, every call through Bifrost. A task counts only if <code>pytest</code> is green afterwards. Both agents fixed 4 of 4.</p>
-      </div>
-
-      <div class="bench" role="group" aria-label="Tokens used per task, naive agent against slendertoken">
-        <div class="bench-key"><span><i class="sw naive"></i>Naive agent</span><span><i class="sw slender"></i>slendertoken</span></div>
-
-        <div class="task"><span class="task-name">discount</span>
-          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:82.0%"></span>25,641</div><div class="bar-row"><span class="fill slender" style="width:29.7%"></span>9,287</div></div>
-          <span class="task-pct">63%</span></div>
-        <div class="task"><span class="task-name">restock</span>
-          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:24.4%"></span>7,622</div><div class="bar-row"><span class="fill slender" style="width:13.7%"></span>4,276</div></div>
-          <span class="task-pct">43%</span></div>
-        <div class="task"><span class="task-name">cart</span>
-          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:26.6%"></span>8,309</div><div class="bar-row"><span class="fill slender" style="width:14.0%"></span>4,385</div></div>
-          <span class="task-pct">47%</span></div>
-        <div class="task"><span class="task-name">month</span>
-          <div class="bars"><div class="bar-row"><span class="fill naive" style="width:28.4%"></span>8,860</div><div class="bar-row"><span class="fill slender" style="width:15.2%"></span>4,754</div></div>
-          <span class="task-pct">46%</span></div>
-        <div class="task total"><span class="task-name">All four</span>
-          <div class="bars"><div class="bar-row">Naive: 50,432 tokens, $0.0065</div><div class="bar-row">slendertoken: 22,702 tokens, $0.0030</div></div>
-          <span class="task-pct">54%</span></div>
-      </div>
-
-      <div class="session" role="group" aria-label="Cumulative tokens over a session of follow-up questions">
-        <div><h3>After question 1</h3><p class="n">968 tokens</p><p class="n dim">naive 3,480</p></div>
-        <div><h3>After question 3</h3><p class="n">4,724 tokens</p><p class="n dim">naive 12,654</p></div>
-        <div><h3>After question 5</h3><p class="n">9,394 tokens</p><p class="n dim">naive 28,810</p></div>
-        <div><h3>Question 6</h3><p class="n">12,710 tokens</p><p class="n stop">naive stopped: Groq refused a 19,450-token request</p></div>
-      </div>
-      <p class="fine">One run per agent, one model, one small synthetic project, free-tier rate limits. On a paid tier the naive agent would not have crashed, it would have cost more. Read the percentages as indicative, not general. Raw numbers and the script to reproduce them are in the repo.</p>
     </div>
   </section>
 
@@ -446,7 +407,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     <div class="wrap">
       <h2 class="h2">How it compares with other agents.</h2>
       <div class="prose">
-        <p>We have not run Claude Code, Codex CLI or OpenCode ourselves, so there is no head-to-head on our four tasks. Below are measurements other people published, with links. They use different tasks and models, so read them as context.</p>
+        <p>We have not run Claude Code, Codex CLI or OpenCode ourselves, so there is no head-to-head here. Below are measurements other people published, with links. They use different tasks and models, so read them as context.</p>
       </div>
 
       <h3 class="compare-h">Tokens sent before the agent reads your prompt</h3>
@@ -467,27 +428,10 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         <div class="ovh"><span class="ovh-name">OpenCode<small>passed 14 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:76.5%"></span>692,195</div></div>
         <div class="ovh"><span class="ovh-name">Codex CLI<small>passed 16 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:73.5%"></span>664,772</div></div>
       </div>
-      <p class="fine">Thirty tasks, all three agents on DeepSeek V4 Flash with a 900-second limit. Source: <a href="https://www.tensorlake.ai/blog/best-ai-coding-agents-2026">Tensorlake&rsquo;s 14-day test</a>. The tasks are much larger than our four small bug fixes, so these totals cannot be compared with ours. The point is that with the model held fixed, the harness alone still changes the bill, and that a lighter harness costs less on every turn. Other published comparisons disagree on which agent uses the fewest tokens, which is why we only show measurements with the method stated.</p>
+      <p class="fine">Thirty tasks, all three agents on DeepSeek V4 Flash with a 900-second limit. Source: <a href="https://www.tensorlake.ai/blog/best-ai-coding-agents-2026">Tensorlake&rsquo;s 14-day test</a>. The point is that with the model held fixed, the harness alone still changes the bill. Other published comparisons disagree on which agent uses the fewest tokens, which is why we only show measurements with the method stated.</p>
     </div>
   </section>
 
-  <section id="company">
-    <div class="wrap">
-      <h2 class="h2">See what it is doing at a glance.</h2>
-      <div class="prose">
-        <p>While a task runs, a small pixel animal sits above the prompt and changes with the agent&rsquo;s current step. You can tell reading from editing from running a command without scrolling the log.</p>
-      </div>
-      <ul class="zoo" aria-label="What each animal means">
-        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Thinking</b><span>Bunny, waiting on the model</span></li>
-        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Searching</b><span>Cat, searching and listing files</span></li>
-        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Reading</b><span>Owl, reading a file</span></li>
-        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Editing</b><span>Frog, changing or writing a file</span></li>
-        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Running</b><span>Penguin, running a command</span></li>
-        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Browsing</b><span>Octopus, searching the web</span></li>
-      </ul>
-      <p class="fine">Drawn as real images in Ghostty and kitty, and as smaller block characters in other terminals.</p>
-    </div>
-  </section>
 </main>
 
 <footer>
