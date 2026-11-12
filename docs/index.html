@@ -6,13 +6,21 @@
 <title>slendertoken: a coding agent for the fewest tokens</title>
 <meta name="description" content="A coding agent for your terminal that finishes the job on the fewest tokens, then shows what the task cost in money, energy and carbon.">
 <link rel="icon" type="image/png" href="assets/animals/think.png">
+<script>try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <style>
 :root {
+  color-scheme: light;
   --chalk: #f4f4f2;
   --ink: #0a0a0a;
   --graphite: #62625e;
   --rule: #d6d6d1;
-  --screen: #0a0a0a;
+  --panel: #0a0a0a;
+  --panel-edge: #0a0a0a;
+  --code: #e7e7e3;
+  --naive: #b9b9b3;
+  --bar-ink: #0a0a0a;
+  --body-2: #2c2c2a;
+  --copy-hover: #1d1d1d;
   --screen-text: #ededed;
   --screen-dim: #8f8f8f;
   --screen-faint: #5c5c5c;
@@ -26,6 +34,37 @@
   --text: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --gutter: clamp(1rem, 4vw, 3rem);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --chalk: #0a0a0a;
+  --ink: #ededed;
+  --graphite: #9a9a96;
+  --rule: #262626;
+  --panel: #141414;
+  --panel-edge: #2a2a2a;
+  --code: #1d1d1d;
+  --naive: #4a4a47;
+  --bar-ink: #ededed;
+  --body-2: #c4c4c0;
+  --copy-hover: #222222;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --chalk: #0a0a0a;
+    --ink: #ededed;
+    --graphite: #9a9a96;
+    --rule: #262626;
+    --panel: #141414;
+    --panel-edge: #2a2a2a;
+    --code: #1d1d1d;
+    --naive: #4a4a47;
+    --bar-ink: #ededed;
+    --body-2: #c4c4c0;
+    --copy-hover: #222222;
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -53,16 +92,18 @@ a:hover { text-decoration-thickness: 2px; }
 .bar nav { display: flex; gap: 1.75rem; font-size: 1rem; }
 .bar nav a { text-decoration: none; }
 .bar nav a:hover { text-decoration: underline; }
+.theme-toggle { font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
+.theme-toggle:hover { text-decoration: underline; text-underline-offset: .25em; }
 
 /* hero */
 .hero { padding-top: clamp(1.5rem, 5vw, 4rem); }
 .wordmark {
   margin: 0;
   font-family: var(--display);
-  font-weight: 700;
+  font-weight: 200;
   font-size: clamp(2.75rem, 17vw, 15rem);
   line-height: .9;
-  letter-spacing: -.045em;
+  letter-spacing: -.05em;
   /* the word is the headline; keep it on one line at every width */
   white-space: nowrap;
   margin-left: -.05em;
@@ -78,10 +119,10 @@ a:hover { text-decoration-thickness: 2px; }
   padding: .55rem 1rem; border: 1px solid var(--rule); border-bottom: 0;
   background: transparent; color: var(--graphite); cursor: pointer; border-radius: .5rem .5rem 0 0;
 }
-.tab[aria-selected="true"] { background: var(--ink); color: var(--screen-text); border-color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--panel); color: var(--screen-text); border-color: var(--panel-edge); }
 .cmd {
-  display: flex; align-items: stretch; background: var(--ink); color: var(--screen-text);
-  border: 1px solid var(--ink); border-radius: 0 .5rem .5rem .5rem;
+  display: flex; align-items: stretch; background: var(--panel); color: var(--screen-text);
+  border: 1px solid var(--panel-edge); border-radius: 0 .5rem .5rem .5rem;
 }
 .cmd pre { margin: 0; padding: 1.1rem 1.25rem; font-family: var(--mono); font-size: .9375rem; line-height: 1.5; overflow-x: auto; flex: 1; white-space: pre; }
 .cmd pre[hidden] { display: none; }
@@ -90,14 +131,14 @@ a:hover { text-decoration-thickness: 2px; }
   padding: 0 1.25rem; border: 0; border-left: 1px solid #2a2a2a; background: transparent; color: var(--screen-text);
   border-radius: 0 .5rem .5rem 0; min-width: 6.5rem;
 }
-.copy:hover { background: #1d1d1d; }
+.copy:hover { background: var(--copy-hover); }
 .install-note { margin: .9rem 0 0; font-size: 1rem; color: var(--graphite); max-width: 46rem; }
-.install-note code, .prose code, .steps code { font-family: var(--mono); font-size: .875em; background: #e7e7e3; padding: .1em .35em; border-radius: .25rem; }
+.install-note code, .prose code, .steps code { font-family: var(--mono); font-size: .875em; background: var(--code); padding: .1em .35em; border-radius: .25rem; }
 
 /* terminal demo */
 .demo { margin-top: clamp(2.5rem, 6vw, 4.5rem); }
 .screen {
-  background: var(--screen); color: var(--screen-text); border-radius: .75rem;
+  background: var(--panel); color: var(--screen-text); border-radius: .75rem; border: 1px solid var(--panel-edge);
   display: grid; grid-template-columns: minmax(0, 1fr) 15.5rem; overflow: hidden;
   font-family: var(--mono); font-size: .8125rem; line-height: 1.55;
 }
@@ -149,22 +190,22 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .rows li { display: grid; grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); gap: 1.5rem; padding: 1.1rem 0; border-top: 1px solid var(--rule); }
 .rows li:last-child { border-bottom: 1px solid var(--rule); }
 .rows h3 { margin: 0; font-size: 1.125rem; font-weight: 600; line-height: 1.4; }
-.rows p { margin: 0; color: #2c2c2a; max-width: 34rem; }
+.rows p { margin: 0; color: var(--body-2); max-width: 34rem; }
 
 /* benchmark */
 .bench { margin-top: 2.5rem; }
 .bench-key { display: flex; gap: 1.5rem; font-size: .9375rem; color: var(--graphite); margin-bottom: 1rem; }
 .sw { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .5rem; vertical-align: -.05rem; }
-.sw.naive { background: #b9b9b3; }
-.sw.slender { background: var(--ink); }
+.sw.naive { background: var(--naive); }
+.sw.slender { background: var(--bar-ink); }
 .task { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 4.5rem; gap: 1rem; align-items: center; padding: .85rem 0; border-top: 1px solid var(--rule); }
 .task:last-of-type { border-bottom: 1px solid var(--rule); }
 .task-name { font-weight: 600; }
 .bars { display: grid; gap: .35rem; }
 .bar-row { display: flex; align-items: center; gap: .6rem; font-family: var(--mono); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .fill { height: .95rem; border-radius: 2px; flex: none; }
-.fill.naive { background: #b9b9b3; }
-.fill.slender { background: var(--ink); }
+.fill.naive { background: var(--naive); }
+.fill.slender { background: var(--bar-ink); }
 .task-pct { font-family: var(--display); font-weight: 650; font-size: 1.5rem; letter-spacing: -.02em; text-align: right; line-height: 1; }
 .total { font-weight: 700; }
 .fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
@@ -181,11 +222,11 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .steps li:last-child { border-bottom: 1px solid var(--rule); }
 .steps li::before { content: counter(step); font-family: var(--display); font-weight: 650; font-size: 1.5rem; line-height: 1.2; }
 .steps h3 { margin: 0 0 .25rem; font-size: 1.125rem; font-weight: 600; }
-.steps p { margin: 0; max-width: 34rem; color: #2c2c2a; }
+.steps p { margin: 0; max-width: 34rem; color: var(--body-2); }
 
 /* animals */
 .zoo { margin: 2.5rem 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
-.zoo li { background: var(--screen); border-radius: .75rem; padding: 1.25rem .75rem 1rem; text-align: center; color: var(--screen-text); }
+.zoo li { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: .75rem; padding: 1.25rem .75rem 1rem; text-align: center; color: var(--screen-text); }
 .zoo img { width: 100%; max-width: 8.5rem; height: auto; image-rendering: pixelated; display: block; margin: 0 auto .75rem; }
 .zoo b { display: block; font-weight: 600; font-size: .9375rem; }
 .zoo span { font-size: .875rem; color: var(--screen-dim); }
@@ -230,6 +271,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     <a href="#install">Install</a>
     <a href="#measured">Benchmark</a>
     <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
+    <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme">Dark</button>
   </nav>
 </header>
 
@@ -420,6 +462,20 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
 (function () {
   var root = document.documentElement;
   root.classList.add('js');
+
+  /* theme: follows the system until you pick one, then remembers it */
+  var toggle = document.getElementById('theme');
+  var media = window.matchMedia('(prefers-color-scheme: dark)');
+  function isDark() { var t = root.getAttribute('data-theme'); return t ? t === 'dark' : media.matches; }
+  function label() { toggle.textContent = isDark() ? 'Light' : 'Dark'; toggle.setAttribute('aria-label', isDark() ? 'Switch to light theme' : 'Switch to dark theme'); }
+  toggle.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+    label();
+  });
+  if (media.addEventListener) media.addEventListener('change', label);
+  label();
 
   /* install tabs and copy */
   var tabs = [document.getElementById('tab-unix'), document.getElementById('tab-win')];
