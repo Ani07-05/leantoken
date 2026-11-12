@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>slendertoken: a coding agent for the fewest tokens</title>
 <meta name="description" content="A coding agent for your terminal that finishes the job on the fewest tokens, then shows what the task cost in money, energy and carbon.">
-<link rel="icon" type="image/png" href="assets/animals/think.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <script>try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <style>
 :root {
@@ -216,6 +216,17 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .session .n.dim { color: var(--graphite); }
 .session .n.stop { color: var(--ink); font-weight: 600; }
 
+
+/* comparison with other agents */
+.ovh { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem; align-items: center; padding: .6rem 0; border-top: 1px solid var(--rule); }
+.ovh:last-of-type { border-bottom: 1px solid var(--rule); }
+.ovh-name { font-weight: 500; }
+.ovh-name small { display: block; font-weight: 400; font-size: .8125rem; color: var(--graphite); }
+.ovh.us .ovh-name { font-weight: 700; }
+.fine a { color: inherit; }
+.compare-h { margin: 3rem 0 .75rem; font-size: 1.25rem; font-weight: 650; letter-spacing: -.015em; }
+.compare-h:first-of-type { margin-top: 2rem; }
+
 /* setup steps */
 .steps { margin: 2rem 0 0; padding: 0; list-style: none; counter-reset: step; }
 .steps li { counter-increment: step; display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1rem; padding: 1.25rem 0; border-top: 1px solid var(--rule); }
@@ -247,6 +258,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   .screen-side { border-left: 0; border-top: 1px solid #2a2a2a; }
   .rows li { grid-template-columns: 1fr; gap: .35rem; }
   .task { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .ovh { grid-template-columns: 1fr; gap: .35rem; }
   .task-name { grid-column: 1 / -1; }
   .session { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .session > div { padding-bottom: 1.25rem; }
@@ -270,6 +282,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   <nav aria-label="Primary">
     <a href="#install">Install</a>
     <a href="#measured">Benchmark</a>
+    <a href="#compare">Compare</a>
     <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
     <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme">Dark</button>
   </nav>
@@ -290,7 +303,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         <pre id="cmd-win" role="tabpanel" aria-labelledby="tab-win" hidden><code>irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex</code></pre>
         <button class="copy" type="button" id="copy">Copy</button>
       </div>
-      <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for your Groq API key. Bring your own. Then run <code>slendertoken</code> in any repo.</p>
+      <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for an API key from any provider Bifrost supports. Bring your own. Then run <code>slendertoken</code> in any repo.</p>
     </div>
 
     <div class="demo" aria-label="Sample session">
@@ -402,12 +415,12 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         </div>
         <ol class="steps">
           <li><div><h3>Downloads slendertoken</h3><p>A single binary for your system, checked against a published SHA-256 before it is installed. No Python, Node or Go.</p></div></li>
-          <li><div><h3>Asks for your Groq key</h3><p>Input is hidden. The key goes into a private config file in <code>~/.slendertoken</code> on your machine and nowhere else. Bring your own key; you pay Groq directly.</p></div></li>
-          <li><div><h3>Installs and starts Bifrost</h3><p>It picks a free port, writes the config with a daily budget on a virtual key, and starts the gateway in the background, bound to your machine only.</p></div></li>
-          <li><div><h3>Proves it works</h3><p>It sends one tiny request through the whole path. If Groq rejects the key, it says so and tells you how to fix it.</p></div></li>
+          <li><div><h3>Asks which provider you use</h3><p>OpenAI, Anthropic, Google Gemini, OpenRouter and a dozen more. You bring your own key and pay the provider directly. Input is hidden, and the key goes into a private config file in <code>~/.slendertoken</code> on your machine and nowhere else.</p></div></li>
+          <li><div><h3>Installs and starts Bifrost</h3><p>It picks a free port, writes the config with a daily budget on a virtual key, and starts the gateway headless: a background process with no window, listening on 127.0.0.1 only, logging to a file.</p></div></li>
+          <li><div><h3>Proves it works</h3><p>It sends one tiny request through the whole path. If the provider rejects the key, it says so and tells you how to fix it.</p></div></li>
         </ol>
         <div class="prose">
-          <p>After a reboot, <code>slendertoken</code> starts the gateway again by itself. <code>slendertoken bifrost status</code>, <code>stop</code> and <code>logs</code> manage it.</p>
+          <p>After a reboot, <code>slendertoken</code> starts the gateway again by itself. <code>slendertoken bifrost status</code>, <code>stop</code> and <code>logs</code> manage it, and <code>slendertoken provider add</code> switches or adds a provider later.</p>
         </div>
       </div>
     </div>
@@ -429,19 +442,48 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     </div>
   </section>
 
+  <section id="compare">
+    <div class="wrap">
+      <h2 class="h2">How it compares with other agents.</h2>
+      <div class="prose">
+        <p>We have not run Claude Code, Codex CLI or OpenCode ourselves, so there is no head-to-head on our four tasks. Below are measurements other people published, with links. They use different tasks and models, so read them as context.</p>
+      </div>
+
+      <h3 class="compare-h">Tokens sent before the agent reads your prompt</h3>
+      <div class="bench" role="group" aria-label="Input tokens each agent sends for a one-word prompt">
+        <div class="ovh"><span class="ovh-name">Claude Code<small>2.1.293</small></span><div class="bar-row"><span class="fill naive" style="width:82.0%"></span>31,480</div></div>
+        <div class="ovh"><span class="ovh-name">Codex CLI<small>0.161</small></span><div class="bar-row"><span class="fill naive" style="width:38.5%"></span>14,768</div></div>
+        <div class="ovh"><span class="ovh-name">OpenCode<small>1.18.35</small></span><div class="bar-row"><span class="fill naive" style="width:35.0%"></span>13,437</div></div>
+        <div class="ovh"><span class="ovh-name">Cursor CLI<small>2026.10</small></span><div class="bar-row"><span class="fill naive" style="width:34.3%"></span>13,174</div></div>
+        <div class="ovh"><span class="ovh-name">Cline CLI<small>2.11</small></span><div class="bar-row"><span class="fill naive" style="width:14.0%"></span>5,382</div></div>
+        <div class="ovh"><span class="ovh-name">Pi<small>0.73.1</small></span><div class="bar-row"><span class="fill naive" style="width:4.9%"></span>1,894</div></div>
+        <div class="ovh us"><span class="ovh-name">slendertoken<small>our estimate, see note</small></span><div class="bar-row"><span class="fill slender" style="width:2.4%"></span>about 600</div></div>
+      </div>
+      <p class="fine">Prompt: &ldquo;reply with the single word OK&rdquo; in an empty repo, median of three runs, each agent on its default model, counting uncached input plus cache reads and writes. Source: <a href="https://testdino.com/blog/harness-overhead-benchmark">TestDino harness overhead benchmark</a>, 8 October 2026. The slendertoken figure is our own estimate from the size of its first request (system prompt, tool definitions and the prompt, at 3.5 to 4 characters per token), not a provider token count, so it carries more uncertainty than the rest. The figure is the fixed cost that goes out with every request, before any file is read.</p>
+
+      <h3 class="compare-h">Average tokens per task on the same model</h3>
+      <div class="bench" role="group" aria-label="Average tokens per task for three agents on one model">
+        <div class="ovh"><span class="ovh-name">Claude Code<small>passed 16 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:82%"></span>741,659</div></div>
+        <div class="ovh"><span class="ovh-name">OpenCode<small>passed 14 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:76.5%"></span>692,195</div></div>
+        <div class="ovh"><span class="ovh-name">Codex CLI<small>passed 16 of 30</small></span><div class="bar-row"><span class="fill naive" style="width:73.5%"></span>664,772</div></div>
+      </div>
+      <p class="fine">Thirty tasks, all three agents on DeepSeek V4 Flash with a 900-second limit. Source: <a href="https://www.tensorlake.ai/blog/best-ai-coding-agents-2026">Tensorlake&rsquo;s 14-day test</a>. The tasks are much larger than our four small bug fixes, so these totals cannot be compared with ours. The point is that with the model held fixed, the harness alone still changes the bill, and that a lighter harness costs less on every turn. Other published comparisons disagree on which agent uses the fewest tokens, which is why we only show measurements with the method stated.</p>
+    </div>
+  </section>
+
   <section id="company">
     <div class="wrap">
-      <h2 class="h2">A small animal keeps you company.</h2>
+      <h2 class="h2">See what it is doing at a glance.</h2>
       <div class="prose">
-        <p>While it works, a pixel animal shows what the agent is doing, so a long task never looks frozen.</p>
+        <p>While a task runs, a small pixel animal sits above the prompt and changes with the agent&rsquo;s current step. You can tell reading from editing from running a command without scrolling the log.</p>
       </div>
-      <ul class="zoo" aria-label="The six animals">
-        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Bunny</b><span>thinking</span></li>
-        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Frog</b><span>editing files</span></li>
-        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Cat</b><span>searching</span></li>
-        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Owl</b><span>reading</span></li>
-        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Penguin</b><span>running commands</span></li>
-        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Octopus</b><span>browsing the web</span></li>
+      <ul class="zoo" aria-label="What each animal means">
+        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Thinking</b><span>Bunny, waiting on the model</span></li>
+        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Searching</b><span>Cat, searching and listing files</span></li>
+        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Reading</b><span>Owl, reading a file</span></li>
+        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Editing</b><span>Frog, changing or writing a file</span></li>
+        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Running</b><span>Penguin, running a command</span></li>
+        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Browsing</b><span>Octopus, searching the web</span></li>
       </ul>
       <p class="fine">Drawn as real images in Ghostty and kitty, and as smaller block characters in other terminals.</p>
     </div>
