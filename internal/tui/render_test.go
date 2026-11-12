@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestLineDeltaIgnoresUnchangedEdges(t *testing.T) {
@@ -71,5 +74,32 @@ func TestEditRowsShowWholeLinesForFragmentEdits(t *testing.T) {
 	want := "-2    return total - pct,+2    return total * 2"
 	if strings.Join(got, ",") != want {
 		t.Fatalf("got %q want %q", strings.Join(got, ","), want)
+	}
+}
+
+const longAnswer = "## Summary\n\nThis repo is a **small shop library**. The main pieces are `pricing.py`, which applies discounts, and `cart.py`, which totals an order. The discount code takes a percentage and subtracts it from the total, which is wrong when the percentage is meant to scale the price.\n\n1. Fixed `apply_discount` so it multiplies by `(1 - pct / 100)`.\n2. Added a test for a 10 percent discount on 100.\n\n- Bullet one with a long line that goes on and on to check that wrapping inside a list item stays aligned under the first word\n- Bullet two\n\n```python\ndef apply_discount(total, pct):\n    return total * (1 - pct / 100)\n```\n\nDone. Run `pytest -q` to confirm."
+
+func TestAnswerWrapsOnceToTheTranscriptColumn(t *testing.T) {
+	for _, width := range []int{80, 100, 130, 200} {
+		m := &Model{width: width, height: 40, side: true}
+		block := m.answerBlock(longAnswer)
+		col := m.mainW() - 2
+		rendered := lipgloss.NewStyle().Width(max(20, col)).Render(block)
+		if got, want := strings.Count(rendered, "\n"), strings.Count(block, "\n"); got != want {
+			t.Errorf("width %d: the transcript wrapped the answer again (%d lines became %d)", width, want+1, got+1)
+		}
+		for _, line := range strings.Split(block, "\n") {
+			if w := lipgloss.Width(line); w > col {
+				t.Errorf("width %d: line is %d wide, column is %d: %q", width, w, col, line)
+				break
+			}
+		}
+	}
+}
+
+func TestInlineCodeHasNoPaddingSpaces(t *testing.T) {
+	m := &Model{width: 120, height: 40}
+	if out := ansi.Strip(m.answerBlock("Found `apply_discount` in pricing.py.")); !strings.Contains(out, "Found apply_discount in pricing.py.") {
+		t.Fatalf("got %q", out)
 	}
 }

@@ -88,7 +88,7 @@ func markdown(src string, width int) string {
 	for _, h := range []*ansi.StyleBlock{&cfg.H1, &cfg.H2, &cfg.H3, &cfg.H4, &cfg.H5, &cfg.H6} {
 		h.BackgroundColor, h.Color, h.Prefix, h.Suffix, h.Bold = nil, sp(pal.Accent), "", "", boolp(true)
 	}
-	cfg.Code.BackgroundColor, cfg.Code.Color = nil, sp(pal.Accent)
+	cfg.Code.BackgroundColor, cfg.Code.Color, cfg.Code.Prefix, cfg.Code.Suffix = nil, sp(pal.Accent), "", ""
 	cfg.CodeBlock.BackgroundColor, cfg.CodeBlock.Margin = nil, &zero
 	cfg.Link.Color, cfg.LinkText.Color = sp(pal.Muted), sp(pal.Text)
 	if pal.Name == "mono" {

@@ -380,7 +380,9 @@ func firstLine(s string) string {
 }
 
 func (m *Model) answerBlock(result string) string {
-	md := markdown(result, m.width-4)
+	// the transcript column is narrower than the screen when the sidebar is open; wrapping to the full width here made
+	// the transcript wrap every long line a second time
+	md := markdown(result, m.mainW()-6)
 	lines := strings.Split(md, "\n")
 	for i, l := range lines {
 		if i == 0 {
