@@ -88,12 +88,17 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* header */
 .bar { display: flex; align-items: center; justify-content: space-between; padding-block: 1.25rem; }
-.bar-mark { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -.03em; text-decoration: none; }
+.bar-mark { font-family: var(--display); font-weight: 200; font-size: 1.75rem; line-height: 1; letter-spacing: -.05em; text-decoration: none; }
 .bar nav { display: flex; gap: 1.75rem; font-size: 1rem; }
 .bar nav a { text-decoration: none; }
 .bar nav a:hover { text-decoration: underline; }
-.theme-toggle { font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
-.theme-toggle:hover { text-decoration: underline; text-underline-offset: .25em; }
+.bar nav { align-items: center; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: .5rem; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
+.icon-btn:hover { background: var(--code); }
+.icon-btn svg { width: 1.25rem; height: 1.25rem; display: block; }
+.theme-toggle .i-sun { display: none; }
+.theme-toggle.is-dark .i-sun { display: block; }
+.theme-toggle.is-dark .i-moon { display: none; }
 
 /* hero */
 .hero { padding-top: clamp(1.5rem, 5vw, 4rem); }
@@ -110,6 +115,13 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .lede { max-width: 38rem; margin: clamp(1.5rem, 3vw, 2.5rem) 0 0; font-size: clamp(1.25rem, 2.2vw, 1.625rem); line-height: 1.45; font-weight: 400; }
 .lede strong { font-weight: 600; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wordmark:has(.ascii) { margin-left: 0; font-size: 1rem; line-height: 1; }
+.ascii { display: block; width: 100%; max-width: 64rem; height: auto; }
+.ascii .a { fill: var(--ink); }
+.ascii .b { fill: var(--graphite); }
+.ascii .s { stroke: var(--naive); }
 
 /* install */
 .install { margin-top: 2rem; max-width: 64rem; }
@@ -193,7 +205,25 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 .rows p { margin: 0; color: var(--body-2); max-width: 34rem; }
 
 /* benchmark */
-.bars { display: grid; gap: .35rem; }
+.bench { margin: 2rem 0 0; display: grid; gap: 1.25rem; }
+.bench-row { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 1rem; align-items: center; }
+.bench-row > b { font-weight: 600; }
+.bars { display: grid; gap: .3rem; }
+.bar-line { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem; gap: .75rem; align-items: center; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+.bar-fill { height: .9rem; border-radius: .2rem; background: var(--bar-ink); }
+.bar-fill.naive { background: var(--naive); }
+.bar-line span { color: var(--graphite); }
+.bench-key { display: flex; gap: 1.5rem; margin-top: 1.5rem; font-size: .9375rem; color: var(--graphite); }
+.bench-key i { display: inline-block; width: .8rem; height: .8rem; border-radius: .15rem; background: var(--bar-ink); margin-right: .45rem; vertical-align: -.05rem; }
+.bench-key i.naive { background: var(--naive); }
+.tbl { width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-variant-numeric: tabular-nums; font-size: 1rem; }
+.tbl th, .tbl td { text-align: left; padding: .6rem .75rem .6rem 0; border-top: 1px solid var(--rule); }
+.tbl thead th { font-weight: 600; border-top: 0; color: var(--graphite); font-size: .9375rem; }
+.tbl tr:last-child td { border-bottom: 1px solid var(--rule); }
+.tbl .num { text-align: right; padding-right: 0; padding-left: .75rem; }
+.tbl tr.total td { font-weight: 600; }
+.tbl-wrap { overflow-x: auto; }
+.bench h3, .bench-sub { margin: 2.5rem 0 0; font-size: 1.125rem; font-weight: 600; }
 .fine { margin: 1.25rem 0 0; font-size: .9375rem; color: var(--graphite); max-width: 44rem; }
 
 
@@ -219,7 +249,13 @@ section { padding-top: clamp(4.5rem, 10vw, 8rem); }
 footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); padding-block: 2rem 3rem; }
 .foot { display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap; font-size: 1rem; }
 .foot p { margin: 0; max-width: 34rem; color: var(--graphite); }
-.foot-mark { font-family: var(--display); font-weight: 700; letter-spacing: -.03em; font-size: 1.25rem; color: var(--ink); margin-bottom: .35rem; display: block; }
+.collab { margin: 2rem 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; }
+.collab a { display: flex; align-items: center; gap: .85rem; padding: .75rem 1.25rem .75rem .75rem; border: 1px solid var(--rule); border-radius: .75rem; text-decoration: none; }
+.collab a:hover { border-color: var(--ink); }
+.collab img { width: 3rem; height: 3rem; border-radius: 50%; background: var(--code); }
+.collab b { display: block; font-weight: 600; line-height: 1.3; }
+.collab span { font-size: .9375rem; color: var(--graphite); }
+.foot-mark { font-family: var(--display); font-weight: 200; letter-spacing: -.05em; font-size: clamp(2rem, 5vw, 3rem); line-height: 1; color: var(--ink); margin-bottom: .75rem; display: inline-block; text-decoration: none; }
 
 @media (max-width: 62rem) {
   .cols { grid-template-columns: 1fr; }
@@ -249,26 +285,30 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   <a class="bar-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
   <nav aria-label="Primary">
     <a href="#install">Install</a>
-    <a href="https://github.com/Ani07-05/slendertoken">GitHub</a>
-    <button class="theme-toggle" id="theme" type="button" aria-label="Switch to dark theme">Dark</button>
+    <a class="icon-btn" href="https://github.com/Ani07-05/slendertoken" aria-label="slendertoken on GitHub" title="GitHub"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    <button class="icon-btn theme-toggle" id="theme" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
   </nav>
 </header>
 
 <main id="main">
   <div class="wrap hero" id="top">
-    <h1 class="wordmark">slendertoken</h1>
+    <h1 class="wordmark"><span class="sr-only">slendertoken</span><svg class="ascii" viewBox="0 0 1020 120" aria-hidden="true" focusable="false"><path class="s" fill="none" stroke-width="1.1" d="M70 7.8H77.2V20M70 12.2H72.8V20M30 27.8H22.8V40M30 32.2H27.2V40M30 27.8L40 27.8M30 32.2L40 32.2M40 27.8L50 27.8M40 32.2L50 32.2M50 27.8L60 27.8M50 32.2L60 32.2M60 27.8L70 27.8M60 32.2L70 32.2M70 32.2H77.2V20M70 27.8H72.8V20M70 47.8H77.2V60M70 52.2H72.8V60M10 72.2H2.8V60M10 67.8H7.2V60M10 67.8L20 67.8M10 72.2L20 72.2M20 67.8L30 67.8M20 72.2L30 72.2M30 67.8L40 67.8M30 72.2L40 72.2M40 67.8L50 67.8M40 72.2L50 72.2M72.8 60L72.8 80M77.2 60L77.2 80M72.8 80L72.8 100M77.2 80L77.2 100M10 112.2H2.8V100M10 107.8H7.2V100M10 107.8L20 107.8M10 112.2L20 112.2M20 107.8L30 107.8M20 112.2L30 112.2M30 107.8L40 107.8M30 112.2L40 112.2M40 107.8L50 107.8M40 112.2L50 112.2M50 107.8L60 107.8M50 112.2L60 112.2M60 107.8L70 107.8M60 112.2L70 112.2M70 112.2H77.2V100M70 107.8H72.8V100M100 7.8H107.2V20M100 12.2H102.8V20M102.8 20L102.8 40M107.2 20L107.2 40M102.8 40L102.8 60M107.2 40L107.2 60M102.8 60L102.8 80M107.2 60L107.2 80M150 87.8H157.2V100M150 92.2H152.8V100M90 112.2H82.8V100M90 107.8H87.2V100M90 107.8L100 107.8M90 112.2L100 112.2M100 107.8L110 107.8M100 112.2L110 112.2M110 107.8L120 107.8M110 112.2L120 112.2M120 107.8L130 107.8M120 112.2L130 112.2M130 107.8L140 107.8M130 112.2L140 112.2M140 107.8L150 107.8M140 112.2L150 112.2M150 112.2H157.2V100M150 107.8H152.8V100M230 7.8H237.2V20M230 12.2H232.8V20M190 27.8H182.8V40M190 32.2H187.2V40M190 27.8L200 27.8M190 32.2L200 32.2M200 27.8L210 27.8M200 32.2L210 32.2M210 27.8L220 27.8M210 32.2L220 32.2M220 27.8L230 27.8M220 32.2L230 32.2M230 32.2H237.2V20M230 27.8H232.8V20M210 47.8H217.2V60M210 52.2H212.8V60M190 67.8H182.8V80M190 72.2H187.2V80M190 67.8L200 67.8M190 72.2L200 72.2M200 67.8L210 67.8M200 72.2L210 72.2M210 72.2H217.2V60M210 67.8H212.8V60M230 87.8H237.2V100M230 92.2H232.8V100M170 112.2H162.8V100M170 107.8H167.2V100M170 107.8L180 107.8M170 112.2L180 112.2M180 107.8L190 107.8M180 112.2L190 112.2M190 107.8L200 107.8M190 112.2L200 112.2M200 107.8L210 107.8M200 112.2L210 112.2M210 107.8L220 107.8M210 112.2L220 112.2M220 107.8L230 107.8M220 112.2L230 112.2M230 112.2H237.2V100M230 107.8H232.8V100M270 7.8H277.2V20M270 12.2H272.8V20M330 7.8H337.2V20M330 12.2H332.8V20M280 27.8H287.2V40M280 32.2H282.8V40M332.8 20L332.8 40M337.2 20L337.2 40M270 47.8H262.8V60M270 52.2H267.2V60M290 47.8H297.2V60M290 52.2H292.8V60M332.8 40L332.8 60M337.2 40L337.2 60M262.8 60L262.8 80M267.2 60L267.2 80M280 72.2H272.8V60M280 67.8H277.2V60M300 67.8H307.2V80M300 72.2H302.8V80M332.8 60L332.8 80M337.2 60L337.2 80M262.8 80L262.8 100M267.2 80L267.2 100M290 92.2H282.8V80M290 87.8H287.2V80M332.8 80L332.8 100M337.2 80L337.2 100M250 112.2H242.8V100M250 107.8H247.2V100M250 107.8L260 107.8M250 112.2L260 112.2M260 112.2H267.2V100M260 107.8H262.8V100M300 112.2H292.8V100M300 107.8H297.2V100M300 107.8L310 107.8M300 112.2L310 112.2M310 107.8L320 107.8M310 112.2L320 112.2M320 107.8L330 107.8M320 112.2L330 112.2M330 112.2H337.2V100M330 107.8H332.8V100M400 7.8H407.2V20M400 12.2H402.8V20M370 27.8H362.8V40M370 32.2H367.2V40M370 27.8L380 27.8M370 32.2L380 32.2M380 27.8L390 27.8M380 32.2L390 32.2M410 27.8H417.2V40M410 32.2H412.8V40M362.8 40L362.8 60M367.2 40L367.2 60M412.8 40L412.8 60M417.2 40L417.2 60M362.8 60L362.8 80M367.2 60L367.2 80M412.8 60L412.8 80M417.2 60L417.2 80M410 87.8H402.8V100M410 92.2H407.2V100M410 92.2H417.2V80M410 87.8H412.8V80M350 112.2H342.8V100M350 107.8H347.2V100M350 107.8L360 107.8M350 112.2L360 112.2M360 107.8L370 107.8M360 112.2L370 112.2M370 107.8L380 107.8M370 112.2L380 112.2M380 107.8L390 107.8M380 112.2L390 112.2M390 107.8L400 107.8M390 112.2L400 112.2M400 112.2H407.2V100M400 107.8H402.8V100M490 7.8H497.2V20M490 12.2H492.8V20M450 27.8H442.8V40M450 32.2H447.2V40M450 27.8L460 27.8M450 32.2L460 32.2M460 27.8L470 27.8M460 32.2L470 32.2M470 27.8L480 27.8M470 32.2L480 32.2M480 27.8L490 27.8M480 32.2L490 32.2M490 32.2H497.2V20M490 27.8H492.8V20M470 47.8H477.2V60M470 52.2H472.8V60M450 67.8H442.8V80M450 72.2H447.2V80M450 67.8L460 67.8M450 72.2L460 72.2M460 67.8L470 67.8M460 72.2L470 72.2M470 72.2H477.2V60M470 67.8H472.8V60M490 87.8H497.2V100M490 92.2H492.8V100M430 112.2H422.8V100M430 107.8H427.2V100M430 107.8L440 107.8M430 112.2L440 112.2M440 107.8L450 107.8M440 112.2L450 112.2M450 107.8L460 107.8M450 112.2L460 112.2M460 107.8L470 107.8M460 112.2L470 112.2M470 107.8L480 107.8M470 112.2L480 112.2M480 107.8L490 107.8M480 112.2L490 112.2M490 112.2H497.2V100M490 107.8H492.8V100M560 7.8H567.2V20M560 12.2H562.8V20M530 27.8H522.8V40M530 32.2H527.2V40M530 27.8L540 27.8M530 32.2L540 32.2M540 27.8L550 27.8M540 32.2L550 32.2M570 27.8H577.2V40M570 32.2H572.8V40M570 47.8H562.8V60M570 52.2H567.2V60M570 52.2H577.2V40M570 47.8H572.8V40M530 67.8H522.8V80M530 72.2H527.2V80M530 67.8L540 67.8M530 72.2L540 72.2M540 67.8L550 67.8M540 72.2L550 72.2M570 67.8H577.2V80M570 72.2H572.8V80M522.8 80L522.8 100M527.2 80L527.2 100M572.8 80L572.8 100M577.2 80L577.2 100M510 112.2H502.8V100M510 107.8H507.2V100M510 107.8L520 107.8M510 112.2L520 112.2M520 112.2H527.2V100M520 107.8H522.8V100M560 112.2H552.8V100M560 107.8H557.2V100M560 107.8L570 107.8M560 112.2L570 112.2M570 112.2H577.2V100M570 107.8H572.8V100M660 7.8H667.2V20M660 12.2H662.8V20M590 32.2H582.8V20M590 27.8H587.2V20M590 27.8L600 27.8M590 32.2L600 32.2M600 27.8L610 27.8M600 32.2L610 32.2M640 27.8H632.8V40M640 32.2H637.2V40M640 27.8L650 27.8M640 32.2L650 32.2M650 27.8L660 27.8M650 32.2L660 32.2M660 32.2H667.2V20M660 27.8H662.8V20M632.8 40L632.8 60M637.2 40L637.2 60M632.8 60L632.8 80M637.2 60L637.2 80M632.8 80L632.8 100M637.2 80L637.2 100M620 112.2H612.8V100M620 107.8H617.2V100M620 107.8L630 107.8M620 112.2L630 112.2M630 112.2H637.2V100M630 107.8H632.8V100M740 7.8H747.2V20M740 12.2H742.8V20M700 27.8H692.8V40M700 32.2H697.2V40M700 27.8L710 27.8M700 32.2L710 32.2M710 27.8L720 27.8M710 32.2L720 32.2M720 27.8L730 27.8M720 32.2L730 32.2M750 27.8H757.2V40M750 32.2H752.8V40M692.8 40L692.8 60M697.2 40L697.2 60M752.8 40L752.8 60M757.2 40L757.2 60M692.8 60L692.8 80M697.2 60L697.2 80M752.8 60L752.8 80M757.2 60L757.2 80M680 92.2H672.8V80M680 87.8H677.2V80M750 87.8H742.8V100M750 92.2H747.2V100M750 92.2H757.2V80M750 87.8H752.8V80M690 112.2H682.8V100M690 107.8H687.2V100M690 107.8L700 107.8M690 112.2L700 112.2M700 107.8L710 107.8M700 112.2L710 112.2M710 107.8L720 107.8M710 112.2L720 112.2M720 107.8L730 107.8M720 112.2L730 112.2M730 107.8L740 107.8M730 112.2L740 112.2M740 112.2H747.2V100M740 107.8H742.8V100M780 7.8H787.2V20M780 12.2H782.8V20M830 7.8H837.2V20M830 12.2H832.8V20M782.8 20L782.8 40M787.2 20L787.2 40M830 27.8H822.8V40M830 32.2H827.2V40M830 32.2H837.2V20M830 27.8H832.8V20M820 47.8H812.8V60M820 52.2H817.2V60M820 52.2H827.2V40M820 47.8H822.8V40M790 67.8H782.8V80M790 72.2H787.2V80M790 67.8L800 67.8M790 72.2L800 72.2M820 67.8H827.2V80M820 72.2H822.8V80M782.8 80L782.8 100M787.2 80L787.2 100M830 87.8H837.2V100M830 92.2H832.8V100M770 112.2H762.8V100M770 107.8H767.2V100M770 107.8L780 107.8M770 112.2L780 112.2M780 112.2H787.2V100M780 107.8H782.8V100M820 112.2H812.8V100M820 107.8H817.2V100M820 107.8L830 107.8M820 112.2L830 112.2M830 112.2H837.2V100M830 107.8H832.8V100M910 7.8H917.2V20M910 12.2H912.8V20M870 27.8H862.8V40M870 32.2H867.2V40M870 27.8L880 27.8M870 32.2L880 32.2M880 27.8L890 27.8M880 32.2L890 32.2M890 27.8L900 27.8M890 32.2L900 32.2M900 27.8L910 27.8M900 32.2L910 32.2M910 32.2H917.2V20M910 27.8H912.8V20M890 47.8H897.2V60M890 52.2H892.8V60M870 67.8H862.8V80M870 72.2H867.2V80M870 67.8L880 67.8M870 72.2L880 72.2M880 67.8L890 67.8M880 72.2L890 72.2M890 72.2H897.2V60M890 67.8H892.8V60M910 87.8H917.2V100M910 92.2H912.8V100M850 112.2H842.8V100M850 107.8H847.2V100M850 107.8L860 107.8M850 112.2L860 112.2M860 107.8L870 107.8M860 112.2L870 112.2M870 107.8L880 107.8M870 112.2L880 112.2M880 107.8L890 107.8M880 112.2L890 112.2M890 107.8L900 107.8M890 112.2L900 112.2M900 107.8L910 107.8M900 112.2L910 112.2M910 112.2H917.2V100M910 107.8H912.8V100M950 7.8H957.2V20M950 12.2H952.8V20M1010 7.8H1017.2V20M1010 12.2H1012.8V20M960 27.8H967.2V40M960 32.2H962.8V40M1012.8 20L1012.8 40M1017.2 20L1017.2 40M950 47.8H942.8V60M950 52.2H947.2V60M970 47.8H977.2V60M970 52.2H972.8V60M1012.8 40L1012.8 60M1017.2 40L1017.2 60M942.8 60L942.8 80M947.2 60L947.2 80M960 72.2H952.8V60M960 67.8H957.2V60M980 67.8H987.2V80M980 72.2H982.8V80M1012.8 60L1012.8 80M1017.2 60L1017.2 80M942.8 80L942.8 100M947.2 80L947.2 100M970 92.2H962.8V80M970 87.8H967.2V80M1012.8 80L1012.8 100M1017.2 80L1017.2 100M930 112.2H922.8V100M930 107.8H927.2V100M930 107.8L940 107.8M930 112.2L940 112.2M940 112.2H947.2V100M940 107.8H942.8V100M980 112.2H972.8V100M980 107.8H977.2V100M980 107.8L990 107.8M980 112.2L990 112.2M990 107.8L1000 107.8M990 112.2L1000 112.2M1000 107.8L1010 107.8M1000 112.2L1010 112.2M1010 112.2H1017.2V100M1010 107.8H1012.8V100"/><path class="a" d="M0 0h10v20h-10zM10 0h10v20h-10zM20 0h10v20h-10zM30 0h10v20h-10zM40 0h10v20h-10zM50 0h10v20h-10zM60 0h10v20h-10zM0 20h10v20h-10zM10 20h10v20h-10zM0 40h10v20h-10zM10 40h10v20h-10zM20 40h10v20h-10zM30 40h10v20h-10zM40 40h10v20h-10zM50 40h10v20h-10zM60 40h10v20h-10zM50 60h10v20h-10zM60 60h10v20h-10zM0 80h10v20h-10zM10 80h10v20h-10zM20 80h10v20h-10zM30 80h10v20h-10zM40 80h10v20h-10zM50 80h10v20h-10zM60 80h10v20h-10zM80 0h10v20h-10zM90 0h10v20h-10zM80 20h10v20h-10zM90 20h10v20h-10zM80 40h10v20h-10zM90 40h10v20h-10zM80 60h10v20h-10zM90 60h10v20h-10zM80 80h10v20h-10zM90 80h10v20h-10zM100 80h10v20h-10zM110 80h10v20h-10zM120 80h10v20h-10zM130 80h10v20h-10zM140 80h10v20h-10zM160 0h10v20h-10zM170 0h10v20h-10zM180 0h10v20h-10zM190 0h10v20h-10zM200 0h10v20h-10zM210 0h10v20h-10zM220 0h10v20h-10zM160 20h10v20h-10zM170 20h10v20h-10zM160 40h10v20h-10zM170 40h10v20h-10zM180 40h10v20h-10zM190 40h10v20h-10zM200 40h10v20h-10zM160 60h10v20h-10zM170 60h10v20h-10zM160 80h10v20h-10zM170 80h10v20h-10zM180 80h10v20h-10zM190 80h10v20h-10zM200 80h10v20h-10zM210 80h10v20h-10zM220 80h10v20h-10zM240 0h10v20h-10zM250 0h10v20h-10zM260 0h10v20h-10zM310 0h10v20h-10zM320 0h10v20h-10zM240 20h10v20h-10zM250 20h10v20h-10zM260 20h10v20h-10zM270 20h10v20h-10zM310 20h10v20h-10zM320 20h10v20h-10zM240 40h10v20h-10zM250 40h10v20h-10zM270 40h10v20h-10zM280 40h10v20h-10zM310 40h10v20h-10zM320 40h10v20h-10zM240 60h10v20h-10zM250 60h10v20h-10zM280 60h10v20h-10zM290 60h10v20h-10zM310 60h10v20h-10zM320 60h10v20h-10zM240 80h10v20h-10zM250 80h10v20h-10zM290 80h10v20h-10zM300 80h10v20h-10zM310 80h10v20h-10zM320 80h10v20h-10zM340 0h10v20h-10zM350 0h10v20h-10zM360 0h10v20h-10zM370 0h10v20h-10zM380 0h10v20h-10zM390 0h10v20h-10zM340 20h10v20h-10zM350 20h10v20h-10zM390 20h10v20h-10zM400 20h10v20h-10zM340 40h10v20h-10zM350 40h10v20h-10zM390 40h10v20h-10zM400 40h10v20h-10zM340 60h10v20h-10zM350 60h10v20h-10zM390 60h10v20h-10zM400 60h10v20h-10zM340 80h10v20h-10zM350 80h10v20h-10zM360 80h10v20h-10zM370 80h10v20h-10zM380 80h10v20h-10zM390 80h10v20h-10zM420 0h10v20h-10zM430 0h10v20h-10zM440 0h10v20h-10zM450 0h10v20h-10zM460 0h10v20h-10zM470 0h10v20h-10zM480 0h10v20h-10zM420 20h10v20h-10zM430 20h10v20h-10zM420 40h10v20h-10zM430 40h10v20h-10zM440 40h10v20h-10zM450 40h10v20h-10zM460 40h10v20h-10zM420 60h10v20h-10zM430 60h10v20h-10zM420 80h10v20h-10zM430 80h10v20h-10zM440 80h10v20h-10zM450 80h10v20h-10zM460 80h10v20h-10zM470 80h10v20h-10zM480 80h10v20h-10zM500 0h10v20h-10zM510 0h10v20h-10zM520 0h10v20h-10zM530 0h10v20h-10zM540 0h10v20h-10zM550 0h10v20h-10zM500 20h10v20h-10zM510 20h10v20h-10zM550 20h10v20h-10zM560 20h10v20h-10zM500 40h10v20h-10zM510 40h10v20h-10zM520 40h10v20h-10zM530 40h10v20h-10zM540 40h10v20h-10zM550 40h10v20h-10zM500 60h10v20h-10zM510 60h10v20h-10zM550 60h10v20h-10zM560 60h10v20h-10zM500 80h10v20h-10zM510 80h10v20h-10zM550 80h10v20h-10zM560 80h10v20h-10z"/><path class="b" d="M580 0h10v20h-10zM590 0h10v20h-10zM600 0h10v20h-10zM610 0h10v20h-10zM620 0h10v20h-10zM630 0h10v20h-10zM640 0h10v20h-10zM650 0h10v20h-10zM610 20h10v20h-10zM620 20h10v20h-10zM610 40h10v20h-10zM620 40h10v20h-10zM610 60h10v20h-10zM620 60h10v20h-10zM610 80h10v20h-10zM620 80h10v20h-10zM680 0h10v20h-10zM690 0h10v20h-10zM700 0h10v20h-10zM710 0h10v20h-10zM720 0h10v20h-10zM730 0h10v20h-10zM670 20h10v20h-10zM680 20h10v20h-10zM730 20h10v20h-10zM740 20h10v20h-10zM670 40h10v20h-10zM680 40h10v20h-10zM730 40h10v20h-10zM740 40h10v20h-10zM670 60h10v20h-10zM680 60h10v20h-10zM730 60h10v20h-10zM740 60h10v20h-10zM680 80h10v20h-10zM690 80h10v20h-10zM700 80h10v20h-10zM710 80h10v20h-10zM720 80h10v20h-10zM730 80h10v20h-10zM760 0h10v20h-10zM770 0h10v20h-10zM810 0h10v20h-10zM820 0h10v20h-10zM760 20h10v20h-10zM770 20h10v20h-10zM800 20h10v20h-10zM810 20h10v20h-10zM760 40h10v20h-10zM770 40h10v20h-10zM780 40h10v20h-10zM790 40h10v20h-10zM800 40h10v20h-10zM760 60h10v20h-10zM770 60h10v20h-10zM800 60h10v20h-10zM810 60h10v20h-10zM760 80h10v20h-10zM770 80h10v20h-10zM810 80h10v20h-10zM820 80h10v20h-10zM840 0h10v20h-10zM850 0h10v20h-10zM860 0h10v20h-10zM870 0h10v20h-10zM880 0h10v20h-10zM890 0h10v20h-10zM900 0h10v20h-10zM840 20h10v20h-10zM850 20h10v20h-10zM840 40h10v20h-10zM850 40h10v20h-10zM860 40h10v20h-10zM870 40h10v20h-10zM880 40h10v20h-10zM840 60h10v20h-10zM850 60h10v20h-10zM840 80h10v20h-10zM850 80h10v20h-10zM860 80h10v20h-10zM870 80h10v20h-10zM880 80h10v20h-10zM890 80h10v20h-10zM900 80h10v20h-10zM920 0h10v20h-10zM930 0h10v20h-10zM940 0h10v20h-10zM990 0h10v20h-10zM1000 0h10v20h-10zM920 20h10v20h-10zM930 20h10v20h-10zM940 20h10v20h-10zM950 20h10v20h-10zM990 20h10v20h-10zM1000 20h10v20h-10zM920 40h10v20h-10zM930 40h10v20h-10zM950 40h10v20h-10zM960 40h10v20h-10zM990 40h10v20h-10zM1000 40h10v20h-10zM920 60h10v20h-10zM930 60h10v20h-10zM960 60h10v20h-10zM970 60h10v20h-10zM990 60h10v20h-10zM1000 60h10v20h-10zM920 80h10v20h-10zM930 80h10v20h-10zM970 80h10v20h-10zM980 80h10v20h-10zM990 80h10v20h-10zM1000 80h10v20h-10z"/></svg></h1>
     <p class="lede">A coding agent for your terminal. It finishes the job on <strong>the fewest tokens</strong>, then shows what the task cost in money, energy and carbon.</p>
 
     <div class="install" id="install">
       <div class="tabs" role="tablist" aria-label="Operating system">
         <button class="tab" role="tab" id="tab-unix" aria-selected="true" aria-controls="cmd-unix" type="button">macOS and Linux</button>
-        <button class="tab" role="tab" id="tab-win" aria-selected="false" aria-controls="cmd-win" type="button" tabindex="-1">Windows</button>
+        <button class="tab" role="tab" id="tab-win" aria-selected="false" aria-controls="cmd-win" type="button" tabindex="-1">Windows (PowerShell)</button>
       </div>
       <div class="cmd">
         <pre id="cmd-unix" role="tabpanel" aria-labelledby="tab-unix"><code>curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.sh | sh</code></pre>
         <pre id="cmd-win" role="tabpanel" aria-labelledby="tab-win" hidden><code>irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex</code></pre>
         <button class="copy" type="button" id="copy">Copy</button>
       </div>
+      <p class="install-note" id="install-hint">Paste into a terminal. Needs <code>curl</code>.</p>
       <p class="install-note">One command installs the app, installs and starts the Bifrost gateway, and asks for an API key from any provider Bifrost supports. Bring your own. Then run <code>slendertoken</code> in any repo.</p>
     </div>
 
@@ -389,15 +429,80 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     </div>
   </section>
 
+  <section id="benchmark">
+    <div class="wrap cols">
+      <h2 class="h2">54% fewer tokens, same 4 of 4 fixed.</h2>
+      <div>
+        <div class="prose">
+          <p>Same model (<code>groq/openai/gpt-oss-120b</code>), same tasks, every call through Bifrost. The naive agent uses the same loop and tools but reads whole files, keeps tool output unclipped and resends the full transcript every turn. Token counts are the API's own usage.</p>
+        </div>
+        <h3 class="bench-sub">Coding: fix a seeded bug in a small shop library</h3>
+        <div class="bench" role="img" aria-label="Tokens per task. discount: 9,287 versus 25,641 naive. restock: 4,276 versus 7,622. cart: 4,385 versus 8,309. month: 4,754 versus 8,860.">
+          <div class="bench-row"><b>discount</b><div class="bars">
+            <div class="bar-line"><div class="bar-fill" style="width:36.2%"></div><span>9,287</span></div>
+            <div class="bar-line"><div class="bar-fill naive" style="width:100.0%"></div><span>25,641</span></div>
+          </div></div>
+          <div class="bench-row"><b>restock</b><div class="bars">
+            <div class="bar-line"><div class="bar-fill" style="width:16.7%"></div><span>4,276</span></div>
+            <div class="bar-line"><div class="bar-fill naive" style="width:29.7%"></div><span>7,622</span></div>
+          </div></div>
+          <div class="bench-row"><b>cart</b><div class="bars">
+            <div class="bar-line"><div class="bar-fill" style="width:17.1%"></div><span>4,385</span></div>
+            <div class="bar-line"><div class="bar-fill naive" style="width:32.4%"></div><span>8,309</span></div>
+          </div></div>
+          <div class="bench-row"><b>month</b><div class="bars">
+            <div class="bar-line"><div class="bar-fill" style="width:18.5%"></div><span>4,754</span></div>
+            <div class="bar-line"><div class="bar-fill naive" style="width:34.6%"></div><span>8,860</span></div>
+          </div></div>
+        </div>
+        <div class="bench-key"><span><i></i>slendertoken</span><span><i class="naive"></i>naive agent</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Task</th><th class="num">slendertoken</th><th class="num">naive</th><th class="num">fewer</th></tr></thead>
+            <tbody><tr><td>discount</td><td class="num">9,287</td><td class="num">25,641</td><td class="num">63%</td></tr><tr><td>restock</td><td class="num">4,276</td><td class="num">7,622</td><td class="num">44%</td></tr><tr><td>cart</td><td class="num">4,385</td><td class="num">8,309</td><td class="num">47%</td></tr><tr><td>month</td><td class="num">4,754</td><td class="num">8,860</td><td class="num">46%</td></tr><tr class="total"><td>total</td><td class="num">22,702 ($0.0030)</td><td class="num">50,432 ($0.0065)</td><td class="num">54%</td></tr></tbody>
+          </table>
+        </div>
+        <p class="fine">Pass means <code>pytest</code> is green afterwards. Both agents fixed 4 of 4.</p>
+
+        <h3 class="bench-sub">Session: 8 follow-up questions about the same project</h3>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>After turn</th><th class="num">slendertoken</th><th class="num">naive</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td class="num">968</td><td class="num">3,480</td></tr>
+              <tr><td>3</td><td class="num">4,724</td><td class="num">12,654</td></tr>
+              <tr><td>5</td><td class="num">9,394</td><td class="num">28,810</td></tr>
+              <tr><td>6</td><td class="num">12,710</td><td class="num">stopped: request too large (413)</td></tr>
+              <tr><td>8</td><td class="num">15,984</td><td class="num">did not finish</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine">Cumulative tokens. The naive agent's transcript outgrew Groq's per-request limit at turn 6, so it could not continue. slendertoken answered 7 of 8 checks.</p>
+        <p class="fine">Limits: one run per agent, one model, one small synthetic project, free-tier rate limits. On a paid tier the naive agent would not have crashed; it would just have cost more. Treat the percentages as indicative. Raw numbers are in <a href="https://github.com/Ani07-05/slendertoken/blob/main/bench/results.json"><code>bench/results.json</code></a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="team">
+    <div class="wrap">
+      <h2 class="h2">Contributors</h2>
+      <ul class="collab">
+        <li><a href="https://github.com/Ani07-05"><img src="https://github.com/Ani07-05.png?size=96" alt="" width="48" height="48" loading="lazy"><div><b>Anirudh</b><span>@Ani07-05</span></div></a></li>
+        <li><a href="https://github.com/apoorv7g"><img src="https://github.com/apoorv7g.png?size=96" alt="" width="48" height="48" loading="lazy"><div><b>Apoorv Gadiya</b><span>@apoorv7g</span></div></a></li>
+        <li><a href="https://github.com/Uncool-dudes"><img src="https://github.com/Uncool-dudes.png?size=96" alt="" width="48" height="48" loading="lazy"><div><b>Ananth Pullur</b><span>@Uncool-dudes</span></div></a></li>
+      </ul>
+    </div>
+  </section>
+
 </main>
 
 <footer>
   <div class="wrap foot">
     <div>
-      <span class="foot-mark">slendertoken</span>
-      <p>Open source. Built for the Geek Room Global AI Hackathon: a coding agent that gets the job done on the fewest tokens.</p>
+      <a class="foot-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
+      <p>Open source. A coding agent that gets the job done on the fewest tokens.</p>
     </div>
-    <p><a href="https://github.com/Ani07-05/slendertoken">Source and issues on GitHub</a><br><a href="https://github.com/Ani07-05/slendertoken#install">Install options</a></p>
+    <p><a href="https://github.com/Ani07-05/slendertoken">Source and issues on GitHub</a><br><a href="#install">Install options</a></p>
   </div>
 </footer>
 
@@ -410,7 +515,11 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   var toggle = document.getElementById('theme');
   var media = window.matchMedia('(prefers-color-scheme: dark)');
   function isDark() { var t = root.getAttribute('data-theme'); return t ? t === 'dark' : media.matches; }
-  function label() { toggle.textContent = isDark() ? 'Light' : 'Dark'; toggle.setAttribute('aria-label', isDark() ? 'Switch to light theme' : 'Switch to dark theme'); }
+  function label() {
+    var d = isDark(), text = d ? 'Switch to light theme' : 'Switch to dark theme';
+    toggle.classList.toggle('is-dark', d);
+    toggle.setAttribute('aria-label', text); toggle.setAttribute('title', text);
+  }
   toggle.addEventListener('click', function () {
     var next = isDark() ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
@@ -423,10 +532,19 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
   /* install tabs and copy */
   var tabs = [document.getElementById('tab-unix'), document.getElementById('tab-win')];
   var panels = [document.getElementById('cmd-unix'), document.getElementById('cmd-win')];
+  var hint = document.getElementById('install-hint');
+  var hints = [
+    'Paste into a terminal on macOS or Linux. Needs <code>curl</code>.',
+    'This is a PowerShell script: paste it into PowerShell or Windows Terminal, not Command Prompt (<code>cmd.exe</code>).'
+  ];
   function select(i) {
     tabs.forEach(function (t, j) { t.setAttribute('aria-selected', String(i === j)); t.tabIndex = i === j ? 0 : -1; });
     panels.forEach(function (p, j) { p.hidden = i !== j; });
+    hint.innerHTML = hints[i];
   }
+  /* pick the tab that matches the visitor's system */
+  var platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '') + ' ' + navigator.userAgent;
+  select(/windows|win32|win64/i.test(platform) ? 1 : 0);
   tabs.forEach(function (t, i) {
     t.addEventListener('click', function () { select(i); });
     t.addEventListener('keydown', function (e) {
