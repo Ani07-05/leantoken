@@ -56,7 +56,8 @@ func platform() (goos, arch string, err error) {
 
 func LatestVersion(ctx context.Context) (string, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, LatestURL, nil)
-	resp, err := http.DefaultClient.Do(req)
+	client := http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("cannot look up the latest Bifrost release: %w", err)
 	}
@@ -92,6 +93,7 @@ func Install(ctx context.Context, log func(string)) (string, error) {
 	if st, err := os.Stat(bin); err == nil && st.Size() > 0 {
 		return bin, nil
 	}
+	log("checking latest Bifrost release...")
 	goos, arch, err := platform()
 	if err != nil {
 		return "", err
@@ -102,7 +104,8 @@ func Install(ctx context.Context, log func(string)) (string, error) {
 	}
 	url := fmt.Sprintf("%s/bifrost/%s/%s/%s/%s", DownloadBase, version, goos, arch, filepath.Base(bin))
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	resp, err := http.DefaultClient.Do(req)
+	client := http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("cannot download Bifrost: %w", err)
 	}

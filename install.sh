@@ -38,10 +38,18 @@ mkdir -p "$dir"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+download() {
+  url=$1
+  dest=$2
+  curl --fail --location --show-error --progress-bar \
+    --connect-timeout 20 --max-time 300 --retry 2 "$url" -o "$dest"
+}
+
 file="slendertoken_${os}_${arch}.tar.gz"
 echo "downloading $file..."
-curl -fsSL "$base/$file" -o "$tmp/$file"
-curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt"
+download "$base/$file" "$tmp/$file"
+echo "downloading checksums..."
+download "$base/checksums.txt" "$tmp/checksums.txt"
 
 want="$(grep " $file\$" "$tmp/checksums.txt" | awk '{print $1}')"
 if command -v sha256sum >/dev/null 2>&1; then got="$(sha256sum "$tmp/$file" | awk '{print $1}')"; else got="$(shasum -a 256 "$tmp/$file" | awk '{print $1}')"; fi

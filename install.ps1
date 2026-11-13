@@ -18,8 +18,9 @@ New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
     Write-Host "downloading $file..."
     try {
-        Invoke-WebRequest "$base/$file" -OutFile "$tmp\$file"
-        Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt"
+        Invoke-WebRequest "$base/$file" -OutFile "$tmp\$file" -TimeoutSec 300
+        Write-Host "downloading checksums..."
+        Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt" -TimeoutSec 60
     } catch {
         throw "could not download $file from $base ($($_.Exception.Message)). Check that a release exists at https://github.com/$repo/releases"
     }
