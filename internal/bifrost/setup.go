@@ -67,10 +67,18 @@ func Setup(ctx context.Context, o SetupOptions, out io.Writer) error {
 	if vk == "" {
 		vk = NewVirtualKey()
 	}
-	if err := WriteConfig(Spec{Providers: providers, VirtualKey: vk, BudgetUSD: o.BudgetUSD}); err != nil {
+	setupToken := ExistingSetupToken()
+	newSetupToken := setupToken == ""
+	if newSetupToken {
+		setupToken = NewSetupToken()
+	}
+	if err := WriteConfig(Spec{Providers: providers, VirtualKey: vk, SetupToken: setupToken, BudgetUSD: o.BudgetUSD}); err != nil {
 		return err
 	}
 	say("Gateway config written ($%.2f per day budget)", o.BudgetUSD)
+	if newSetupToken {
+		say("Dashboard setup token (use once to create its admin account): %s", setupToken)
+	}
 
 	url := fmt.Sprintf("http://localhost:%d", port)
 	if err := Start(ctx, url); err != nil {

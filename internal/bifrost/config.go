@@ -14,6 +14,7 @@ import (
 type Spec struct {
 	Providers  []KeyedProvider
 	VirtualKey string
+	SetupToken string
 	BudgetUSD  float64
 }
 
@@ -26,10 +27,23 @@ func NewVirtualKey() string {
 	return "sk-bf-" + hex.EncodeToString(b)
 }
 
+// NewSetupToken creates the one-time token Bifrost requires to bootstrap dashboard authentication.
+func NewSetupToken() string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 // WriteConfig writes the declarative gateway config: one entry per provider, and a virtual key that may use all of them
 // with a daily budget. Bifrost reads this on start, so setup needs no calls to its management API. The file holds the
 // provider keys, so it is private to the user.
 func WriteConfig(s Spec) error {
+	if s.SetupToken == "" {
+		s.SetupToken = ExistingSetupToken()
+		if s.SetupToken == "" {
+			s.SetupToken = NewSetupToken()
+		}
+	}
 	providers := map[string]any{}
 	var configs []any
 	for _, p := range s.Providers {
@@ -38,6 +52,7 @@ func WriteConfig(s Spec) error {
 	}
 	cfg := map[string]any{
 		"$schema":      "https://www.getbifrost.ai/schema",
+		"setup_token":  s.SetupToken,
 		"config_store": map[string]any{"enabled": true, "type": "sqlite", "config": map[string]any{"path": filepath.Join(DataDir(), "config.db")}},
 		"providers":    providers,
 		"governance": map[string]any{
@@ -72,6 +87,19 @@ func ExistingVirtualKey() string {
 		return ""
 	}
 	return cfg.Governance.VirtualKeys[0].Value
+}
+
+// ExistingSetupToken keeps the dashboard bootstrap token stable when setup is rerun.
+func ExistingSetupToken() string {
+	data, err := os.ReadFile(ConfigPath())
+	if err != nil {
+		return ""
+	}
+	var cfg struct{ SetupToken string `json:"setup_token"` }
+	if json.Unmarshal(data, &cfg) != nil {
+		return ""
+	}
+	return cfg.SetupToken
 }
 
 // FreePort returns the first port from 8080 up that nothing is listening on.
