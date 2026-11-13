@@ -12,7 +12,7 @@
 ![gateway](https://img.shields.io/badge/gateway-Bifrost-808080?style=flat-square)
 ![providers](https://img.shields.io/badge/providers-16-5fd787?style=flat-square)
 
-[slendertoken.vercel.app](https://slendertoken.vercel.app)
+[slendertoken.vercel.app](https://slendertoken.vercel.app) · [Pitch deck (PDF)](slendertoken-deck.pdf)
 
 </div>
 

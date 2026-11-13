@@ -345,7 +345,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
             <div class="stat"><dt>lines</dt><dd id="s-lines">-</dd></div>
           </dl>
           <div class="t-work" style="margin-top:1.5rem;flex-direction:column;align-items:flex-start;gap:.6rem">
-            <img id="critter" src="assets/animals/think.png" alt="" width="160" height="64">
+            <img id="critter" src="assets/animals/think.gif" alt="" width="160" height="64">
             <p id="verb"><b>Noodling…</b></p>
           </div>
         </aside>
@@ -364,12 +364,12 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
         <p>While it works, a pixel animal shows what the agent is doing, so a long task never looks frozen.</p>
       </div>
       <ul class="zoo" aria-label="The six animals">
-        <li><img src="assets/animals/think.png" alt="" width="160" height="64"><b>Bunny</b><span>thinking</span></li>
-        <li><img src="assets/animals/type.png" alt="" width="160" height="64"><b>Frog</b><span>editing files</span></li>
-        <li><img src="assets/animals/search.png" alt="" width="160" height="64"><b>Cat</b><span>searching</span></li>
-        <li><img src="assets/animals/read.png" alt="" width="160" height="64"><b>Owl</b><span>reading</span></li>
-        <li><img src="assets/animals/shell.png" alt="" width="160" height="64"><b>Penguin</b><span>running commands</span></li>
-        <li><img src="assets/animals/web.png" alt="" width="160" height="64"><b>Octopus</b><span>browsing the web</span></li>
+        <li><img src="assets/animals/think.gif" alt="" width="160" height="64"><b>Bunny</b><span>thinking</span></li>
+        <li><img src="assets/animals/type.gif" alt="" width="160" height="64"><b>Frog</b><span>editing files</span></li>
+        <li><img src="assets/animals/search.gif" alt="" width="160" height="64"><b>Cat</b><span>searching</span></li>
+        <li><img src="assets/animals/read.gif" alt="" width="160" height="64"><b>Owl</b><span>reading</span></li>
+        <li><img src="assets/animals/shell.gif" alt="" width="160" height="64"><b>Penguin</b><span>running commands</span></li>
+        <li><img src="assets/animals/web.gif" alt="" width="160" height="64"><b>Octopus</b><span>browsing the web</span></li>
       </ul>
       <p class="fine">Drawn as real images in Ghostty and kitty, and as smaller block characters in other terminals.</p>
     </div>
@@ -502,7 +502,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
       <a class="foot-mark" href="#top" aria-label="slendertoken, back to top">slendertoken</a>
       <p>Open source. A coding agent that gets the job done on the fewest tokens.</p>
     </div>
-    <p><a href="https://github.com/Ani07-05/slendertoken">Source and issues on GitHub</a><br><a href="#install">Install options</a></p>
+    <p><a href="https://github.com/Ani07-05/slendertoken">Source and issues on GitHub</a><br><a href="#install">Install options</a><br><a href="https://github.com/Ani07-05/slendertoken/blob/main/slendertoken-deck.pdf">Read more</a> (pitch deck, PDF)</p>
   </div>
 </footer>
 
@@ -592,7 +592,7 @@ footer { margin-top: clamp(5rem, 10vw, 8rem); border-top: 1px solid var(--ink); 
     els.cost.textContent = '$' + (s[0] * 0.00000014).toFixed(4);
     els.lines.textContent = step >= 3 ? '+1 -1' : '-';
     els.verb.innerHTML = '<b>' + s[2] + '</b>';
-    els.critter.src = 'assets/animals/' + s[3] + '.png';
+    els.critter.src = 'assets/animals/' + s[3] + '.gif';
   }
   function showAll() {
     lines.forEach(function (l) { l.classList.add('on'); });
