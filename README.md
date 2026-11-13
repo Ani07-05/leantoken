@@ -23,6 +23,8 @@ curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.
 irm https://raw.githubusercontent.com/Ani07-05/slendertoken/main/install.ps1 | iex         # Windows
 ```
 
+To remove slendertoken on macOS or Linux, run `curl -fsSL https://raw.githubusercontent.com/Ani07-05/slendertoken/main/uninstall.sh | sh`. It asks before removing the executable and `~/.slendertoken`, including saved provider keys and Bifrost data. Add `-s -- --yes` to the `sh` command to skip the prompt, or set `SLENDERTOKEN_BIN_DIR` if you used a custom install directory.
+
 One command, no Python, Node or Go. It:
 
 1. Downloads the `slendertoken` binary and checks its SHA-256.
